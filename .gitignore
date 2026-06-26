@@ -30,3 +30,30 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Node Modules & Dependencies
+node_modules/
+jspm_packages/
+.npm
+.yarn-integrity
+*.tgz
+
+# Logs & Debug
+logs
+*.log
+*-debug.log*
+*-error.log*
+
+# Environment Variables (Sangat penting untuk keamanan)
+.env
+.env.*
+
+# Coverage & Build
+coverage/
+.nyc_output/
+build/Release
+
+# IDE & OS Specific
+.DS_Store
+.vscode/
+.idea/
