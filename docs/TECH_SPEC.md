@@ -177,17 +177,11 @@ func RoleMiddleware(allowedRoles ...string) gin.HandlerFunc {
 
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Request validation failed",
-    "details": [
-      { "field": "email", "message": "Email is required" },
-      { "field": "password", "message": "Min 6 characters" }
-    ],
-    "timestamp": "2024-06-20T10:30:00Z",
-    "request_id": "req_abc123xyz"
-  }
+  "code": 400,
+  "message": "invalid request",
+  "error": "email is required",
+  "timestamp": "2024-06-20T10:30:00Z",
+  "request_id": "req_abc123xyz"
 }
 ```
 
