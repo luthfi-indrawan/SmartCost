@@ -39,31 +39,34 @@
 | `Accept`       | `application/json` | Yes      | Response format                      |
 | `X-Request-ID` | UUID v4            | No       | Trace ID untuk logging dan debugging |
 
-### 1.3 Pagination & Metadata Standards
+### 1.3 Pagination & metadatadata Standards
 
 Semua endpoint `GET` yang mengembalikan list WAJIB menggunakan format response berikut:
 
 ```json
 {
-  "success": true,
-  "data": [...],
-  "meta": {
-    "pagination": {
-      "current_page": 1,
-      "per_page": 20,
-      "total_pages": 5,
-      "total_items": 98,
-      "has_next_page": true,
-      "has_prev_page": false
-    },
-    "sort": {
-      "field": "created_at",
-      "direction": "desc"
-    },
-    "filters": {
-      "search": "nasi",
-      "category_id": "cat_001",
-      "stock_status": "all"
+  "code": 200,
+  "message": "successfully gether user list",
+  "result": {
+    "data": [...],
+    "metadatadata": {
+      "pagination": {
+        "current_page": 1,
+        "page_size": 20,
+        "total_pages": 5,
+        "total_items": 98,
+        "has_next_page": true,
+        "has_prev_page": false
+      },
+      "sort": {
+        "field": "created_at",
+        "direction": "desc"
+      },
+      "filters": {
+        "search": "nasi",
+        "category_id": "cat_001",
+        "stock_status": "all"
+      }
     }
   }
 }
@@ -74,7 +77,7 @@ Semua endpoint `GET` yang mengembalikan list WAJIB menggunakan format response b
 | Parameter    | Type    | Default      | Description                         |
 | :----------- | :------ | :----------- | :---------------------------------- |
 | `page`       | integer | 1            | Halaman aktif                       |
-| `per_page`   | integer | 20           | Item per halaman (max 100)          |
+| `page_size`  | integer | 20           | Item per halaman (max 100)          |
 | `sort_by`    | string  | `created_at` | Field sorting                       |
 | `sort_order` | string  | `desc`       | `asc` atau `desc`                   |
 | `search`     | string  | -            | Pencarian global (case-insensitive) |
@@ -100,8 +103,9 @@ Login untuk Owner dan Kasir.
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "user": {
       "id": "usr_a1b2c3d4",
       "name": "Andi Wijaya",
@@ -114,27 +118,11 @@ Login untuk Owner dan Kasir.
       "access_token_expires_at": "2024-06-21T08:00:00Z",
       "refresh_token_expires_at": "2024-06-28T08:00:00Z"
     }
-  },
-  "meta": null
+  }
 }
 ```
 
 > **Note:** Token diset sebagai `httpOnly` cookie oleh server. Frontend tidak perlu menyimpan token di localStorage.
-
-**Failed Response (401):**
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INVALID_CREDENTIALS",
-    "message": "Email atau password salah",
-    "details": null,
-    "timestamp": "2024-06-20T10:30:00Z",
-    "request_id": "req_abc123"
-  }
-}
-```
 
 **Business Logic & Rules:**
 
@@ -157,9 +145,9 @@ Logout dan invalidate token.
 
 ```json
 {
-  "success": true,
-  "data": { "message": "Logout berhasil" },
-  "meta": null
+  "code": 200,
+  "message": "successfully",
+  "result": null
 }
 ```
 
@@ -179,11 +167,11 @@ Refresh access token menggunakan refresh token cookie.
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "access_token_expires_at": "2024-06-21T16:00:00Z"
-  },
-  "meta": null
+  }
 }
 ```
 
@@ -205,24 +193,18 @@ Ambil data user yang sedang login.
 
 ```json
 {
-  "success": true,
-  "data": {
-    "id": "usr_a1b2c3d4",
-    "name": "Andi Wijaya",
-    "email": "andi@warungku.com",
-    "role": "owner",
-    "permissions": [
-      "products.read",
-      "products.write",
-      "reports.read",
-      "cashier.operate"
-    ],
-    "store": {
-      "id": "str_x1y2z3",
-      "name": "Warung Andi"
-    }
-  },
-  "meta": null
+  "code": 200,
+  "message": "successfully",
+  "id": "usr_a1b2c3d4",
+  "name": "Andi Wijaya",
+  "email": "andi@warungku.com",
+  "role": "owner",
+  "permissions": [
+    "products.read",
+    "products.write",
+    "reports.read",
+    "cashier.operate"
+  ]
 }
 ```
 
@@ -258,8 +240,9 @@ Register kasir baru (Owner only).
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "id": "usr_e5f6g7h8",
     "name": "Siti Aminah",
     "email": "siti@warungku.com",
@@ -267,22 +250,6 @@ Register kasir baru (Owner only).
     "phone": "081234567890",
     "is_active": true,
     "created_at": "2024-06-20T10:30:00Z"
-  },
-  "meta": null
-}
-```
-
-**Failed Response (409):**
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "EMAIL_EXISTS",
-    "message": "Email sudah terdaftar",
-    "details": [{ "field": "email", "message": "Email sudah digunakan" }],
-    "timestamp": "2024-06-20T10:30:00Z",
-    "request_id": "req_def456"
   }
 }
 ```
@@ -308,36 +275,43 @@ List semua user (kasir) dengan pagination.
 | `role` | string | - | Filter: `owner`, `cashier`, `all` |
 | `is_active` | boolean | - | Filter status aktif |
 | `search` | string | - | Cari nama/email |
+| `page` | integer | 1 | Halaman |
+| `page_size` | integer | 20 | Item per halaman |
+| `sort_by` | string | `created_at` | `name`, `stock`, `base_price`, `created_at` |
+| `sort_order` | string | `desc` | `asc`, `desc` |
 
 **Success Response (200):**
 
 ```json
 {
-  "success": true,
-  "data": [
-    {
-      "id": "usr_e5f6g7h8",
-      "name": "Siti Aminah",
-      "email": "siti@warungku.com",
-      "role": "cashier",
-      "phone": "081234567890",
-      "is_active": true,
-      "total_sales": 1545000,
-      "transaction_count": 47,
-      "created_at": "2024-06-20T10:30:00Z"
+  "code": 200,
+  "message": "successfully",
+  "result": {
+    "data": [
+      {
+        "id": "usr_e5f6g7h8",
+        "name": "Siti Aminah",
+        "email": "siti@warungku.com",
+        "role": "cashier",
+        "phone": "081234567890",
+        "is_active": true,
+        "total_sales": 1545000,
+        "transaction_count": 47,
+        "created_at": "2024-06-20T10:30:00Z"
+      }
+    ],
+    "metadatadata": {
+      "pagination": {
+        "current_page": 1,
+        "per_page": 20,
+        "total_pages": 1,
+        "total_items": 3,
+        "has_next_page": false,
+        "has_prev_page": false
+      },
+      "sort": { "field": "created_at", "direction": "desc" },
+      "filters": { "role": "cashier", "search": "" }
     }
-  ],
-  "meta": {
-    "pagination": {
-      "current_page": 1,
-      "per_page": 20,
-      "total_pages": 1,
-      "total_items": 3,
-      "has_next_page": false,
-      "has_prev_page": false
-    },
-    "sort": { "field": "created_at", "direction": "desc" },
-    "filters": { "role": "cashier", "search": "" }
   }
 }
 ```
@@ -359,8 +333,9 @@ Detail user dengan statistik penjualan.
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "id": "usr_e5f6g7h8",
     "name": "Siti Aminah",
     "email": "siti@warungku.com",
@@ -375,8 +350,7 @@ Detail user dengan statistik penjualan.
     },
     "created_at": "2024-06-20T10:30:00Z",
     "updated_at": "2024-06-20T10:30:00Z"
-  },
-  "meta": null
+  }
 }
 ```
 
@@ -428,8 +402,9 @@ Tambah produk baru dengan multi-harga (Owner only).
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "id": "prd_i9j0k1l2",
     "name": "Teh Kotak",
     "sku": "TK-001",
@@ -461,28 +436,6 @@ Tambah produk baru dengan multi-harga (Owner only).
     "stock_status": "SAFE",
     "created_at": "2024-06-20T10:30:00Z",
     "updated_at": "2024-06-20T10:30:00Z"
-  },
-  "meta": null
-}
-```
-
-**Failed Response (400):**
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Validasi gagal",
-    "details": [
-      {
-        "field": "price_tiers[0].min_qty",
-        "message": "min_qty harus lebih besar dari 1"
-      },
-      { "field": "sku", "message": "SKU sudah digunakan" }
-    ],
-    "timestamp": "2024-06-20T10:30:00Z",
-    "request_id": "req_ghi789"
   }
 }
 ```
@@ -519,7 +472,7 @@ List produk dengan filter, search, dan pagination.
 | `stock_status` | string | `all` | `all`, `safe`, `low`, `minus` |
 | `is_active` | boolean | true | Filter status aktif |
 | `page` | integer | 1 | Halaman |
-| `per_page` | integer | 20 | Item per halaman |
+| `page_size` | integer | 20 | Item per halaman |
 | `sort_by` | string | `created_at` | `name`, `stock`, `base_price`, `created_at` |
 | `sort_order` | string | `desc` | `asc`, `desc` |
 
@@ -527,39 +480,42 @@ List produk dengan filter, search, dan pagination.
 
 ```json
 {
-  "success": true,
-  "data": [
-    {
-      "id": "prd_i9j0k1l2",
-      "name": "Teh Kotak",
-      "sku": "TK-001",
-      "barcode": "8991234567890",
-      "category": { "id": "cat_minuman", "name": "Minuman" },
-      "base_price": 3000,
-      "stock": 50,
-      "min_stock_threshold": 10,
-      "unit": "pcs",
-      "is_active": true,
-      "stock_status": "SAFE",
-      "effective_price": 3000,
-      "created_at": "2024-06-20T10:30:00Z"
-    }
-  ],
-  "meta": {
-    "pagination": {
-      "current_page": 1,
-      "per_page": 20,
-      "total_pages": 3,
-      "total_items": 52,
-      "has_next_page": true,
-      "has_prev_page": false
-    },
-    "sort": { "field": "created_at", "direction": "desc" },
-    "filters": {
-      "search": "",
-      "category_id": "",
-      "stock_status": "all",
-      "is_active": true
+  "code": 200,
+  "message": "successfully",
+  "result": {
+    "data": [
+      {
+        "id": "prd_i9j0k1l2",
+        "name": "Teh Kotak",
+        "sku": "TK-001",
+        "barcode": "8991234567890",
+        "category": { "id": "cat_minuman", "name": "Minuman" },
+        "base_price": 3000,
+        "stock": 50,
+        "min_stock_threshold": 10,
+        "unit": "pcs",
+        "is_active": true,
+        "stock_status": "SAFE",
+        "effective_price": 3000,
+        "created_at": "2024-06-20T10:30:00Z"
+      }
+    ],
+    "metadatadata": {
+      "pagination": {
+        "current_page": 1,
+        "per_page": 20,
+        "total_pages": 3,
+        "total_items": 52,
+        "has_next_page": true,
+        "has_prev_page": false
+      },
+      "sort": { "field": "created_at", "direction": "desc" },
+      "filters": {
+        "search": "",
+        "category_id": "",
+        "stock_status": "all",
+        "is_active": true
+      }
     }
   }
 }
@@ -583,8 +539,9 @@ Detail produk.
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "id": "prd_i9j0k1l2",
     "name": "Teh Kotak",
     "sku": "TK-001",
@@ -606,8 +563,7 @@ Detail produk.
     },
     "created_at": "2024-06-20T10:30:00Z",
     "updated_at": "2024-06-20T10:30:00Z"
-  },
-  "meta": null
+  }
 }
 ```
 
@@ -640,6 +596,16 @@ Update produk.
 }
 ```
 
+**Success Response (200):**
+
+```json
+{
+  "code": 200,
+  "message": "successfully",
+  "result": null
+}
+```
+
 **Business Logic & Rules:**
 
 - **Rule #1:** Partial update didukung. Hanya field yang dikirim yang di-update.
@@ -661,9 +627,9 @@ Soft delete produk.
 
 ```json
 {
-  "success": true,
-  "data": { "message": "Produk berhasil dihapus" },
-  "meta": null
+  "code": 200,
+  "message": "successfully",
+  "result": null
 }
 ```
 
@@ -687,31 +653,34 @@ List semua kategori.
 
 ```json
 {
-  "success": true,
-  "data": [
-    {
-      "id": "cat_makanan",
-      "name": "Makanan",
-      "product_count": 24,
-      "color": "#FF6B6B",
-      "created_at": "2024-01-15T08:00:00Z"
-    },
-    {
-      "id": "cat_minuman",
-      "name": "Minuman",
-      "product_count": 18,
-      "color": "#4ECDC4",
-      "created_at": "2024-01-15T08:00:00Z"
-    }
-  ],
-  "meta": {
-    "pagination": {
-      "current_page": 1,
-      "per_page": 50,
-      "total_pages": 1,
-      "total_items": 2,
-      "has_next_page": false,
-      "has_prev_page": false
+  "code": 200,
+  "message": "successfully",
+  "result": {
+    "data": [
+      {
+        "id": "cat_makanan",
+        "name": "Makanan",
+        "product_count": 24,
+        "color": "#FF6B6B",
+        "created_at": "2024-01-15T08:00:00Z"
+      },
+      {
+        "id": "cat_minuman",
+        "name": "Minuman",
+        "product_count": 18,
+        "color": "#4ECDC4",
+        "created_at": "2024-01-15T08:00:00Z"
+      }
+    ],
+    "metadata": {
+      "pagination": {
+        "current_page": 1,
+        "per_page": 50,
+        "total_pages": 1,
+        "total_items": 2,
+        "has_next_page": false,
+        "has_prev_page": false
+      }
     }
   }
 }
@@ -788,8 +757,9 @@ Buat transaksi baru (checkout atau hold bill).
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "id": "txn_q7r8s9t0",
     "transaction_code": "TRX-200624-0001",
     "type": "direct",
@@ -824,8 +794,7 @@ Buat transaksi baru (checkout atau hold bill).
       "change": 20000
     },
     "created_at": "2024-06-20T14:30:00Z"
-  },
-  "meta": null
+  }
 }
 ```
 
@@ -833,8 +802,9 @@ Buat transaksi baru (checkout atau hold bill).
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "id": "txn_q7r8s9t0",
     "transaction_code": "TRX-200624-0001",
     "type": "hold",
@@ -848,27 +818,6 @@ Buat transaksi baru (checkout atau hold bill).
     "summary": { "subtotal": 90000, "total": 90000 },
     "created_at": "2024-06-20T14:30:00Z"
   },
-  "meta": null
-}
-```
-
-**Failed Response (409):**
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "RACE_CONDITION",
-    "message": "Stok produk berubah saat proses transaksi. Silakan coba lagi.",
-    "details": [
-      {
-        "field": "items[0].product_id",
-        "message": "Stock changed during transaction"
-      }
-    ],
-    "timestamp": "2024-06-20T10:30:00Z",
-    "request_id": "req_jkl012"
-  }
 }
 ```
 
@@ -944,37 +893,40 @@ List transaksi dengan filter lengkap.
 
 ```json
 {
-  "success": true,
-  "data": [
-    {
-      "id": "txn_q7r8s9t0",
-      "transaction_code": "TRX-200624-0001",
-      "type": "direct",
-      "status": "COMPLETED",
-      "cashier": { "id": "usr_e5f6g7h8", "name": "Siti Aminah" },
-      "item_count": 3,
-      "total": 90000,
-      "payment_method": "cash",
-      "created_at": "2024-06-20T14:30:00Z"
-    }
-  ],
-  "meta": {
-    "pagination": {
-      "current_page": 1,
-      "per_page": 20,
-      "total_pages": 5,
-      "total_items": 98,
-      "has_next_page": true,
-      "has_prev_page": false
-    },
-    "sort": { "field": "created_at", "direction": "desc" },
-    "filters": {
-      "status": "all",
-      "type": "all",
-      "cashier_id": "",
-      "date_from": "",
-      "date_to": "",
-      "search": ""
+  "code": 200,
+  "message": "successfully",
+  "result": {
+    "data": [
+      {
+        "id": "txn_q7r8s9t0",
+        "transaction_code": "TRX-200624-0001",
+        "type": "direct",
+        "status": "COMPLETED",
+        "cashier": { "id": "usr_e5f6g7h8", "name": "Siti Aminah" },
+        "item_count": 3,
+        "total": 90000,
+        "payment_method": "cash",
+        "created_at": "2024-06-20T14:30:00Z"
+      }
+    ],
+    "metadata": {
+      "pagination": {
+        "current_page": 1,
+        "per_page": 20,
+        "total_pages": 5,
+        "total_items": 98,
+        "has_next_page": true,
+        "has_prev_page": false
+      },
+      "sort": { "field": "created_at", "direction": "desc" },
+      "filters": {
+        "status": "all",
+        "type": "all",
+        "cashier_id": "",
+        "date_from": "",
+        "date_to": "",
+        "search": ""
+      }
     }
   }
 }
@@ -999,8 +951,9 @@ Detail transaksi lengkap.
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "id": "txn_q7r8s9t0",
     "transaction_code": "TRX-200624-0001",
     "type": "direct",
@@ -1034,8 +987,7 @@ Detail transaksi lengkap.
     "void_logs": [],
     "created_at": "2024-06-20T14:30:00Z",
     "updated_at": "2024-06-20T14:30:00Z"
-  },
-  "meta": null
+  }
 }
 ```
 
@@ -1069,8 +1021,9 @@ Return item dari transaksi.
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "transaction_id": "txn_q7r8s9t0",
     "returned_items": [
       {
@@ -1084,8 +1037,7 @@ Return item dari transaksi.
     "new_total": 85000,
     "void_log_id": "vld_y5z6a7b8",
     "created_at": "2024-06-20T15:00:00Z"
-  },
-  "meta": null
+  }
 }
 ```
 
@@ -1138,14 +1090,14 @@ Lanjutkan hold bill ke pembayaran.
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "id": "txn_q7r8s9t0",
     "status": "COMPLETED",
     "payment": { "method": "cash", "amount_paid": 100000, "change": 10000 },
     "completed_at": "2024-06-20T15:15:00Z"
-  },
-  "meta": null
+  }
 }
 ```
 
@@ -1168,27 +1120,30 @@ List hold bill aktif.
 
 ```json
 {
-  "success": true,
-  "data": [
-    {
-      "id": "txn_q7r8s9t0",
-      "transaction_code": "TRX-200624-0001",
-      "hold_note": "Meja 5 / Andi",
-      "cashier": { "id": "usr_e5f6g7h8", "name": "Siti Aminah" },
-      "item_count": 3,
-      "total": 90000,
-      "held_at": "2024-06-20T14:30:00Z",
-      "elapsed_minutes": 45
-    }
-  ],
-  "meta": {
-    "pagination": {
-      "current_page": 1,
-      "per_page": 20,
-      "total_pages": 1,
-      "total_items": 3,
-      "has_next_page": false,
-      "has_prev_page": false
+  "code": 200,
+  "message": "successfully",
+  "resutl": {
+    "data": [
+      {
+        "id": "txn_q7r8s9t0",
+        "transaction_code": "TRX-200624-0001",
+        "hold_note": "Meja 5 / Andi",
+        "cashier": { "id": "usr_e5f6g7h8", "name": "Siti Aminah" },
+        "item_count": 3,
+        "total": 90000,
+        "held_at": "2024-06-20T14:30:00Z",
+        "elapsed_minutes": 45
+      }
+    ],
+    "metadata": {
+      "pagination": {
+        "current_page": 1,
+        "per_page": 20,
+        "total_pages": 1,
+        "total_items": 3,
+        "has_next_page": false,
+        "has_prev_page": false
+      }
     }
   }
 }
@@ -1223,43 +1178,46 @@ Laporan penjualan dengan aggregasi.
 
 ```json
 {
-  "success": true,
-  "data": {
-    "summary": {
-      "total_revenue": 1545000,
-      "total_transactions": 47,
-      "average_transaction_value": 32872,
-      "total_items_sold": 156
-    },
-    "breakdown": [
-      {
-        "date": "2024-06-20",
-        "revenue": 945000,
-        "transaction_count": 28,
-        "items_sold": 89
+  "code": 200,
+  "message": "successfully",
+  "result": {
+    "data": {
+      "summary": {
+        "total_revenue": 1545000,
+        "total_transactions": 47,
+        "average_transaction_value": 32872,
+        "total_items_sold": 156
       },
-      {
-        "date": "2024-06-19",
-        "revenue": 600000,
-        "transaction_count": 19,
-        "items_sold": 67
+      "breakdown": [
+        {
+          "date": "2024-06-20",
+          "revenue": 945000,
+          "transaction_count": 28,
+          "items_sold": 89
+        },
+        {
+          "date": "2024-06-19",
+          "revenue": 600000,
+          "transaction_count": 19,
+          "items_sold": 67
+        }
+      ],
+      "cashier_performance": [
+        {
+          "cashier_id": "usr_e5f6g7h8",
+          "cashier_name": "Siti Aminah",
+          "total_revenue": 945000,
+          "transaction_count": 28
+        }
+      ]
+    },
+    "metadata": {
+      "filters": {
+        "period": "daily",
+        "date_from": "2024-06-19",
+        "date_to": "2024-06-20",
+        "cashier_id": ""
       }
-    ],
-    "cashier_performance": [
-      {
-        "cashier_id": "usr_e5f6g7h8",
-        "cashier_name": "Siti Aminah",
-        "total_revenue": 945000,
-        "transaction_count": 28
-      }
-    ]
-  },
-  "meta": {
-    "filters": {
-      "period": "daily",
-      "date_from": "2024-06-19",
-      "date_to": "2024-06-20",
-      "cashier_id": ""
     }
   }
 }
@@ -1307,8 +1265,9 @@ Notifikasi stok menipis dan minus.
 
 ```json
 {
-  "success": true,
-  "data": {
+  "code": 200,
+  "message": "successfully",
+  "result": {
     "critical_count": 2,
     "low_count": 5,
     "alerts": [
@@ -1329,8 +1288,7 @@ Notifikasi stok menipis dan minus.
         "last_updated": "2024-06-20T12:00:00Z"
       }
     ]
-  },
-  "meta": null
+  }
 }
 ```
 
@@ -1365,30 +1323,33 @@ Audit trail pembatalan/return.
 
 ```json
 {
-  "success": true,
-  "data": [
-    {
-      "id": "vld_y5z6a7b8",
-      "transaction_id": "txn_q7r8s9t0",
-      "transaction_code": "TRX-200624-0001",
-      "cashier": { "id": "usr_e5f6g7h8", "name": "Siti Aminah" },
-      "product": { "id": "prd_i9j0k1l2", "name": "Teh Kotak" },
-      "qty_returned": 2,
-      "refund_amount": 5000,
-      "reason": "Produk rusak",
-      "created_at": "2024-06-20T15:00:00Z"
+  "code": 200,
+  "message": "successfully",
+  "result": {
+    "data": [
+      {
+        "id": "vld_y5z6a7b8",
+        "transaction_id": "txn_q7r8s9t0",
+        "transaction_code": "TRX-200624-0001",
+        "cashier": { "id": "usr_e5f6g7h8", "name": "Siti Aminah" },
+        "product": { "id": "prd_i9j0k1l2", "name": "Teh Kotak" },
+        "qty_returned": 2,
+        "refund_amount": 5000,
+        "reason": "Produk rusak",
+        "created_at": "2024-06-20T15:00:00Z"
+      }
+    ],
+    "metadata": {
+      "pagination": {
+        "current_page": 1,
+        "per_page": 20,
+        "total_pages": 2,
+        "total_items": 35,
+        "has_next_page": true,
+        "has_prev_page": false
+      },
+      "filters": { "cashier_id": "", "date_from": "", "date_to": "" }
     }
-  ],
-  "meta": {
-    "pagination": {
-      "current_page": 1,
-      "per_page": 20,
-      "total_pages": 2,
-      "total_items": 35,
-      "has_next_page": true,
-      "has_prev_page": false
-    },
-    "filters": { "cashier_id": "", "date_from": "", "date_to": "" }
   }
 }
 ```

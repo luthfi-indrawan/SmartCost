@@ -136,7 +136,7 @@ func main() {
 	r.Use(middleware.SecureHeaders()) // Proteksi Security Header
 	r.Use(middleware.Timeout(time.Duration(cfg.App.TimeoutSeconds) * time.Second)) // Request Timeout
 
-	api := r.Group("/api")
+	api := r.Group("/api/v1")
 
 	// health check endpoint
 	api.GET("/health", func(c *gin.Context) {
