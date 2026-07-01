@@ -123,7 +123,7 @@ func main() {
 	helper := helper.NewHelper(cfg)
 
 	// init middleware
-	middleware := middleware.NewMiddleware(cfg, helper)
+	middleware := middleware.NewMiddleware(cfg, helper, rdb)
 
 	// setup gin
 	gin.SetMode(gin.ReleaseMode)

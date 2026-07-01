@@ -14,7 +14,7 @@ func New(
 ) {
 	g := r.Group("/auth")
 
-	g.POST("/login", handler.LoginHandler)
+	g.POST("/login", middleware.RateLimiter(), handler.LoginHandler)
 	g.POST("/logout", middleware.Auth(), handler.LogoutHandler)
 	g.POST("/refresh", middleware.Auth(), handler.RefreshHandler)
 	g.GET("/me", middleware.Auth(), handler.MeHandler)

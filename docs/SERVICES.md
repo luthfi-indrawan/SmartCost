@@ -1,15 +1,15 @@
 # Services API Contract (SERVICES) - Smart Cost V1
 
-**Versi:** 1.0
-**Base URL:** `https://api.smartcost.app/api/v1`
+**Versi:** 1.1  
+**Status:** Regenerated & Synced with PRD  
+**Base URL:** `https://api.smartcost.app/api/v1`  
 **Content-Type:** `application/json`
-**Authentication:** JWT Bearer via `httpOnly` Cookie (`access_token`)
 
 ---
 
 ## Daftar Isi
 
-1. [Global Configuration Network](#1-global-configuration-network)
+1. [Global Configuration](#1-global-configuration)
 2. [Authentication Module](#2-authentication-module)
 3. [Users Module (Owner Only)](#3-users-module-owner-only)
 4. [Products Module](#4-products-module)
@@ -21,7 +21,7 @@
 
 ---
 
-## 1. Global Configuration Network
+## 1. Global Configuration
 
 ### 1.1 Base URLs
 
@@ -33,42 +33,130 @@
 
 ### 1.2 Global Headers
 
-| Header         | Value              | Required | Description                          |
-| :------------- | :----------------- | :------- | :----------------------------------- |
-| `Content-Type` | `application/json` | Yes      | Request body format                  |
-| `Accept`       | `application/json` | Yes      | Response format                      |
-| `X-Request-ID` | UUID v4            | No       | Trace ID untuk logging dan debugging |
+| Header          | Value              | Required | Description                            |
+| :-------------- | :----------------- | :------- | :------------------------------------- |
+| `Content-Type`  | `application/json` | Yes      | Request body format                    |
+| `Accept`        | `application/json` | Yes      | Response format                        |
+| `Authorization` | `Bearer <token>`   | Yes\*    | Access token untuk protected endpoints |
+| `X-Request-ID`  | UUID v4            | No       | Trace ID untuk logging dan debugging   |
 
-### 1.3 Pagination & metadatadata Standards
+> \*Header `Authorization` WAJIB untuk semua endpoint kecuali `POST /auth/login`.
+
+### 1.3 Authentication Mechanism
+
+```
++-------------------------------------------------------------+
+|                    AUTH FLOW DIAGRAM                        |
++-------------------------------------------------------------+
+
+  Client          Server                Client Memory
+    |                |                       |
+    | 1. POST /auth  |                       |
+    |    /login      |                       |
+    |   {email,pwd}  |                       |
+    |--------------->|                       |
+    |                |                       |
+    | 2. Response    |                       |
+    |   {access_     |                       |
+    |    token,...}  |                       |
+    |<---------------|                       |
+    |                |                       |
+    | 3. Set-Cookie: |                       |
+    |   refresh_     |                       |
+    |   token=...    |                       |
+    |   (httpOnly)   |                       |
+    |<---------------|                       |
+    |                |                       |
+    | 4. Store       |                       |
+    |   access_token |---------------------->|
+    |   in Zustand   |                       |
+    |                |                       |
+    | 5. Requests    |                       |
+    |   Authorization|                       |
+    |   : Bearer ... |                       |
+    |--------------->|                       |
++-------------------------------------------------------------+
+```
+
+**Token Storage Strategy:**
+
+- **Access Token**: Disimpan di memory (Zustand/React Context), TIDAK di localStorage. Dikirim via `Authorization: Bearer <token>` header.
+- **Refresh Token**: Disimpan di `httpOnly` cookie (`refresh_token`), diatur oleh server. Client tidak bisa akses via JavaScript.
+
+### 1.4 JWT Payload Standard
+
+```json
+{
+  "sub": "usr_a1b2c3d4",
+  "role": "owner",
+  "type": "access",
+  "iat": 1718900000,
+  "exp": 1718986400,
+  "jti": "unique_token_id"
+}
+```
+
+| Claim  | Type   | Description                   |
+| :----- | :----- | :---------------------------- |
+| `sub`  | string | User ID (UUID)                |
+| `role` | string | `owner` atau `cashier`        |
+| `type` | string | `access` atau `refresh`       |
+| `iat`  | number | Issued at (Unix timestamp)    |
+| `exp`  | number | Expiration (Unix timestamp)   |
+| `jti`  | string | Unique JWT ID untuk blacklist |
+
+### 1.5 Response Wrapper Standard
+
+#### Success Response (2xx)
+
+```json
+{
+  "code": 200,
+  "message": "Successfully retrieved data",
+  "result": {}
+}
+```
+
+#### Error Response (4xx/5xx)
+
+```json
+{
+  "code": 400,
+  "message": "Validation failed",
+  "error": "string"
+}
+```
+
+### 1.6 Pagination & Metadata Standards
 
 Semua endpoint `GET` yang mengembalikan list WAJIB menggunakan format response berikut:
 
 ```json
 {
   "code": 200,
-  "message": "successfully gether user list",
-  "result": {
-    "data": [...],
-    "metadatadata": {
-      "pagination": {
-        "current_page": 1,
-        "page_size": 20,
-        "total_pages": 5,
-        "total_items": 98,
-        "has_next_page": true,
-        "has_prev_page": false
-      },
-      "sort": {
-        "field": "created_at",
-        "direction": "desc"
-      },
-      "filters": {
-        "search": "nasi",
-        "category_id": "cat_001",
-        "stock_status": "all"
-      }
+  "message": "Successfully retrieved list",
+ "result": {
+   "data": [...],
+  "metadata": {
+    "pagination": {
+      "current_page": 1,
+      "page_size": 20,
+      "total_pages": 5,
+      "total_items": 98,
+      "has_next_page": true,
+      "has_prev_page": false
+    },
+    "sort": {
+      "field": "created_at",
+      "direction": "desc"
+    },
+    "filters": {
+      "search": "nasi",
+      "category_id": "cat_001",
+      "stock_status": "all"
     }
   }
+ }
 }
 ```
 
@@ -104,17 +192,19 @@ Login untuk Owner dan Kasir.
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Login successful",
   "result": {
     "user": {
       "id": "usr_a1b2c3d4",
       "name": "Andi Wijaya",
       "email": "andi@warungku.com",
       "role": "owner",
-      "avatar_url": "https://cdn.smartcost.app/avatars/usr_a1b2c3d4.jpg",
+      "phone": "081234567890",
+      "is_active": true,
       "created_at": "2024-01-15T08:00:00Z"
     },
     "session": {
+      "access_token": "eyJhbGciOiJSUzI1NiIs...",
       "access_token_expires_at": "2024-06-21T08:00:00Z",
       "refresh_token_expires_at": "2024-06-28T08:00:00Z"
     }
@@ -122,16 +212,18 @@ Login untuk Owner dan Kasir.
 }
 ```
 
-> **Note:** Token diset sebagai `httpOnly` cookie oleh server. Frontend tidak perlu menyimpan token di localStorage.
+> **Note:** Server juga mengirimkan `Set-Cookie` header dengan `refresh_token` (httpOnly, Secure, SameSite=Strict). Frontend menyimpan `access_token` di memory state (Zustand).
 
 **Business Logic & Rules:**
 
 - **Rule #1:** Sistem menggunakan JWT dengan algoritma RS256 (asymmetric). Private key disimpan di server, public key digunakan untuk validasi.
 - **Rule #2:** Setiap login menghasilkan pasangan Access Token (24 jam) dan Refresh Token (7 hari).
-- **Rule #3:** Saat logout, JWT ID (`jti`) dimasukkan ke Redis blacklist dengan TTL sama dengan expiry token, sehingga token tidak bisa dipakai lagi meskipun belum expired.
-- **Rule #4:** Password diverifikasi menggunakan bcrypt dengan cost factor 12. Perbandingan dilakukan secara konstan waktu (constant-time comparison) untuk mencegah timing attack.
-- **Rule #5:** Jika user `is_active = false`, login ditolak dengan pesan "Akun dinonaktifkan, hubungi owner."
-- **Rule #6:** Rate limiting: Maksimal 5 percobaan login gagal per IP dalam 15 menit. Jika terlampaui, IP diblokir selama 30 menit.
+- **Rule #3:** Access Token dikirim di response body (untuk disimpan di memory frontend) DAN tidak diset sebagai cookie.
+- **Rule #4:** Refresh Token diset sebagai `httpOnly` cookie oleh server. Frontend tidak bisa akses via JavaScript.
+- **Rule #5:** Saat logout, JWT ID (`jti`) dari access token dimasukkan ke Redis blacklist dengan TTL sama dengan sisa expiry token.
+- **Rule #6:** Password diverifikasi menggunakan bcrypt dengan cost factor 12. Perbandingan dilakukan secara konstan waktu (constant-time comparison) untuk mencegah timing attack.
+- **Rule #7:** Jika user `is_active = false`, login ditolak dengan pesan "Akun dinonaktifkan, hubungi owner."
+- **Rule #8:** Rate limiting: Maksimal 5 percobaan login gagal per IP dalam 15 menit. Jika terlampaui, IP diblokir selama 30 menit.
 
 ---
 
@@ -139,23 +231,26 @@ Login untuk Owner dan Kasir.
 
 Logout dan invalidate token.
 
-**Request:** Empty body (token dari cookie)
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Request:** Empty body
 
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Logout successful",
   "result": null
 }
 ```
 
 **Business Logic & Rules:**
 
-- **Rule #1:** Server membaca `access_token` dari cookie `httpOnly`, mengekstrak `jti` (JWT ID), dan memasukkannya ke Redis SET `jwt_blacklist` dengan TTL = sisa waktu expiry token.
-- **Rule #2:** Cookie `access_token` dan `refresh_token` dihapus dari browser dengan mengatur `Max-Age=0` dan `Expires=Thu, 01 Jan 1970 00:00:00 GMT`.
-- **Rule #3:** Jika token sudah tidak valid (expired atau tidak ada di cookie), tetap mengembalikan 200 OK karena tujuan akhir (user tidak lagi terautentikasi) sudah tercapai.
+- **Rule #1:** Server membaca `access_token` dari header `Authorization: Bearer <token>`, mengekstrak `jti` (JWT ID), dan memasukkannya ke Redis SET `jwt_blacklist` dengan TTL = sisa waktu expiry token.
+- **Rule #2:** Server juga membaca `refresh_token` dari cookie, mengekstrak `jti`-nya, dan memasukkannya ke Redis blacklist.
+- **Rule #3:** Cookie `refresh_token` dihapus dari browser dengan mengatur `Max-Age=0` dan `Expires=Thu, 01 Jan 1970 00:00:00 GMT`.
+- **Rule #4:** Jika token sudah tidak valid (expired atau tidak ada di header), tetap mengembalikan 200 OK karena tujuan akhir (user tidak lagi terautentikasi) sudah tercapai.
 
 ---
 
@@ -163,13 +258,16 @@ Logout dan invalidate token.
 
 Refresh access token menggunakan refresh token cookie.
 
+**Headers:** Cookie `refresh_token` harus ada (httpOnly cookie, dikirim otomatis oleh browser).
+
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Token refreshed successfully",
   "result": {
+    "access_token": "eyJhbGciOiJSUzI1NiIs...",
     "access_token_expires_at": "2024-06-21T16:00:00Z"
   }
 }
@@ -177,11 +275,11 @@ Refresh access token menggunakan refresh token cookie.
 
 **Business Logic & Rules:**
 
-- **Rule #1:** Endpoint ini membaca `refresh_token` dari cookie terpisah (berbeda dari `access_token`).
+- **Rule #1:** Endpoint ini membaca `refresh_token` dari cookie `httpOnly`.
 - **Rule #2:** Refresh token divalidasi: signature, expiry, dan dicek apakah `jti`-nya ada di Redis blacklist.
-- **Rule #3:** Jika refresh token valid, sistem generate Access Token baru dengan `jti` baru dan update cookie `access_token`.
+- **Rule #3:** Jika refresh token valid, sistem generate Access Token baru dengan `jti` baru.
 - **Rule #4:** Refresh Token TIDAK di-rotate (tidak diganti). Hanya Access Token yang diperbarui untuk mengurangi kompleksitas.
-- **Rule #5:** Jika refresh token invalid/expired, hapus semua cookie dan kembalikan 401 agar user login ulang.
+- **Rule #5:** Jika refresh token invalid/expired, hapus cookie refresh_token dan kembalikan 401 agar user login ulang.
 
 ---
 
@@ -189,22 +287,30 @@ Refresh access token menggunakan refresh token cookie.
 
 Ambil data user yang sedang login.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
-  "id": "usr_a1b2c3d4",
-  "name": "Andi Wijaya",
-  "email": "andi@warungku.com",
-  "role": "owner",
-  "permissions": [
-    "products.read",
-    "products.write",
-    "reports.read",
-    "cashier.operate"
-  ]
+  "message": "Successfully retrieved user profile",
+  "result": {
+    "id": "usr_a1b2c3d4",
+    "name": "Andi Wijaya",
+    "email": "andi@warungku.com",
+    "role": "owner",
+    "phone": "081234567890",
+    "is_active": true,
+    "permissions": [
+      "products.read",
+      "products.write",
+      "reports.read",
+      "users.manage",
+      "cashier.operate"
+    ],
+    "created_at": "2024-01-15T08:00:00Z"
+  }
 }
 ```
 
@@ -224,6 +330,8 @@ Ambil data user yang sedang login.
 
 Register kasir baru (Owner only).
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Request:**
 
 ```json
@@ -240,8 +348,8 @@ Register kasir baru (Owner only).
 
 ```json
 {
-  "code": 200,
-  "message": "successfully",
+  "code": 201,
+  "message": "Cashier registered successfully",
   "result": {
     "id": "usr_e5f6g7h8",
     "name": "Siti Aminah",
@@ -269,23 +377,26 @@ Register kasir baru (Owner only).
 
 List semua user (kasir) dengan pagination.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Query Parameters:**
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `role` | string | - | Filter: `owner`, `cashier`, `all` |
-| `is_active` | boolean | - | Filter status aktif |
-| `search` | string | - | Cari nama/email |
-| `page` | integer | 1 | Halaman |
-| `page_size` | integer | 20 | Item per halaman |
-| `sort_by` | string | `created_at` | `name`, `stock`, `base_price`, `created_at` |
-| `sort_order` | string | `desc` | `asc`, `desc` |
+
+| Parameter    | Type    | Default      | Description                       |
+| :----------- | :------ | :----------- | :-------------------------------- |
+| `role`       | string  | -            | Filter: `owner`, `cashier`, `all` |
+| `is_active`  | boolean | -            | Filter status aktif               |
+| `search`     | string  | -            | Cari nama/email                   |
+| `page`       | integer | 1            | Halaman                           |
+| `page_size`  | integer | 20           | Item per halaman                  |
+| `sort_by`    | string  | `created_at` | `name`, `created_at`              |
+| `sort_order` | string  | `desc`       | `asc`, `desc`                     |
 
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Successfully retrieved user list",
   "result": {
     "data": [
       {
@@ -300,17 +411,24 @@ List semua user (kasir) dengan pagination.
         "created_at": "2024-06-20T10:30:00Z"
       }
     ],
-    "metadatadata": {
+    "metadata": {
       "pagination": {
         "current_page": 1,
-        "per_page": 20,
+        "page_size": 20,
         "total_pages": 1,
         "total_items": 3,
         "has_next_page": false,
         "has_prev_page": false
       },
-      "sort": { "field": "created_at", "direction": "desc" },
-      "filters": { "role": "cashier", "search": "" }
+      "sort": {
+        "field": "created_at",
+        "direction": "desc"
+      },
+      "filters": {
+        "role": "cashier",
+        "is_active": true,
+        "search": ""
+      }
     }
   }
 }
@@ -329,12 +447,14 @@ List semua user (kasir) dengan pagination.
 
 Detail user dengan statistik penjualan.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Successfully retrieved user details",
   "result": {
     "id": "usr_e5f6g7h8",
     "name": "Siti Aminah",
@@ -363,11 +483,86 @@ Detail user dengan statistik penjualan.
 
 ---
 
+### 3.4 PUT /users/:id
+
+Update data user (Owner only).
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Request:**
+
+```json
+{
+  "name": "Siti Aminah Updated",
+  "phone": "081234567891",
+  "is_active": false
+}
+```
+
+**Success Response (200):**
+
+```json
+{
+  "code": 200,
+  "message": "User updated successfully",
+  "result": {
+    "id": "usr_e5f6g7h8",
+    "name": "Siti Aminah Updated",
+    "email": "siti@warungku.com",
+    "role": "cashier",
+    "phone": "081234567891",
+    "is_active": false,
+    "updated_at": "2024-06-20T12:00:00Z"
+  }
+}
+```
+
+**Business Logic & Rules:**
+
+- **Rule #1:** Partial update didukung. Hanya field yang dikirim yang di-update.
+- **Rule #2:** Field `email` tidak bisa diubah untuk menjaga integritas autentikasi.
+- **Rule #3:** Field `role` tidak bisa diubah setelah registrasi.
+- **Rule #4:** Owner tidak bisa menonaktifkan dirinya sendiri (prevent lockout).
+- **Rule #5:** Jika `is_active` diubah ke `false`, semua session aktif user tersebut di-blacklist (force logout).
+
+---
+
+### 3.5 DELETE /users/:id
+
+Soft delete user (Owner only).
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Success Response (200):**
+
+```json
+{
+  "code": 200,
+  "message": "User deactivated successfully",
+  "result": {
+    "id": "usr_e5f6g7h8",
+    "is_active": false,
+    "deleted_at": "2024-06-20T12:00:00Z"
+  }
+}
+```
+
+**Business Logic & Rules:**
+
+- **Rule #1:** SOFT DELETE. `deleted_at` di-set ke `NOW()`, `is_active = false`.
+- **Rule #2:** Owner tidak bisa menghapus dirinya sendiri. Jika mencoba, kembalikan 422.
+- **Rule #3:** Semua session aktif user yang dihapus di-blacklist (force logout).
+- **Rule #4:** Transaksi historis milik user tetap ada dan bisa diakses.
+
+---
+
 ## 4. Products Module
 
 ### 4.1 POST /products
 
 Tambah produk baru dengan multi-harga (Owner only).
+
+**Headers:** `Authorization: Bearer <access_token>`
 
 **Request:**
 
@@ -402,8 +597,8 @@ Tambah produk baru dengan multi-harga (Owner only).
 
 ```json
 {
-  "code": 200,
-  "message": "successfully",
+  "code": 201,
+  "message": "Product created successfully",
   "result": {
     "id": "prd_i9j0k1l2",
     "name": "Teh Kotak",
@@ -417,6 +612,7 @@ Tambah produk baru dengan multi-harga (Owner only).
     "stock": 50,
     "min_stock_threshold": 10,
     "unit": "pcs",
+    "description": "Teh kotak 250ml",
     "is_active": true,
     "price_tiers": [
       {
@@ -442,7 +638,7 @@ Tambah produk baru dengan multi-harga (Owner only).
 
 **Business Logic & Rules:**
 
-- **Rule #1:** `sku` dan `barcode` harus unik secara global (UNIQUE constraint). Jika duplikat, kembalikan 400 dengan detail field yang bermasalah.
+- **Rule #1:** `sku` dan `barcode` harus unik secara global (UNIQUE constraint). Jika duplikat, kembalikan 409 dengan detail field yang bermasalah.
 - **Rule #2:** `price_tiers` bersifat opsional. Jika tidak dikirim, produk hanya memiliki harga dasar (`base_price`).
 - **Rule #3:** Validasi `price_tiers`:
   - `min_qty` harus > 1 (tidak boleh 1, karena harga dasar sudah untuk qty 1).
@@ -464,24 +660,27 @@ Tambah produk baru dengan multi-harga (Owner only).
 
 List produk dengan filter, search, dan pagination.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Query Parameters:**
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `search` | string | - | Cari nama, SKU, atau barcode |
-| `category_id` | string | - | Filter kategori |
-| `stock_status` | string | `all` | `all`, `safe`, `low`, `minus` |
-| `is_active` | boolean | true | Filter status aktif |
-| `page` | integer | 1 | Halaman |
-| `page_size` | integer | 20 | Item per halaman |
-| `sort_by` | string | `created_at` | `name`, `stock`, `base_price`, `created_at` |
-| `sort_order` | string | `desc` | `asc`, `desc` |
+
+| Parameter      | Type    | Default      | Description                                 |
+| :------------- | :------ | :----------- | :------------------------------------------ |
+| `search`       | string  | -            | Cari nama, SKU, atau barcode                |
+| `category_id`  | string  | -            | Filter kategori                             |
+| `stock_status` | string  | `all`        | `all`, `safe`, `low`, `minus`               |
+| `is_active`    | boolean | true         | Filter status aktif                         |
+| `page`         | integer | 1            | Halaman                                     |
+| `page_size`    | integer | 20           | Item per halaman                            |
+| `sort_by`      | string  | `created_at` | `name`, `stock`, `base_price`, `created_at` |
+| `sort_order`   | string  | `desc`       | `asc`, `desc`                               |
 
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Successfully retrieved product list",
   "result": {
     "data": [
       {
@@ -489,7 +688,10 @@ List produk dengan filter, search, dan pagination.
         "name": "Teh Kotak",
         "sku": "TK-001",
         "barcode": "8991234567890",
-        "category": { "id": "cat_minuman", "name": "Minuman" },
+        "category": {
+          "id": "cat_minuman",
+          "name": "Minuman"
+        },
         "base_price": 3000,
         "stock": 50,
         "min_stock_threshold": 10,
@@ -500,16 +702,19 @@ List produk dengan filter, search, dan pagination.
         "created_at": "2024-06-20T10:30:00Z"
       }
     ],
-    "metadatadata": {
+    "metadata": {
       "pagination": {
         "current_page": 1,
-        "per_page": 20,
+        "page_size": 20,
         "total_pages": 3,
         "total_items": 52,
         "has_next_page": true,
         "has_prev_page": false
       },
-      "sort": { "field": "created_at", "direction": "desc" },
+      "sort": {
+        "field": "created_at",
+        "direction": "desc"
+      },
       "filters": {
         "search": "",
         "category_id": "",
@@ -535,18 +740,23 @@ List produk dengan filter, search, dan pagination.
 
 Detail produk.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Successfully retrieved product details",
   "result": {
     "id": "prd_i9j0k1l2",
     "name": "Teh Kotak",
     "sku": "TK-001",
     "barcode": "8991234567890",
-    "category": { "id": "cat_minuman", "name": "Minuman" },
+    "category": {
+      "id": "cat_minuman",
+      "name": "Minuman"
+    },
     "base_price": 3000,
     "stock": 50,
     "min_stock_threshold": 10,
@@ -554,7 +764,12 @@ Detail produk.
     "description": "Teh kotak 250ml",
     "is_active": true,
     "price_tiers": [
-      { "id": "pt_a1b2", "min_qty": 10, "price": 2500, "label": "Grosir 10pcs" }
+      {
+        "id": "pt_a1b2",
+        "min_qty": 10,
+        "price": 2500,
+        "label": "Grosir 10pcs"
+      }
     ],
     "stock_status": "SAFE",
     "sales_stats": {
@@ -581,6 +796,8 @@ Detail produk.
 
 Update produk.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Request:**
 
 ```json
@@ -590,8 +807,17 @@ Update produk.
   "stock": 45,
   "min_stock_threshold": 15,
   "price_tiers": [
-    { "id": "pt_a1b2", "min_qty": 10, "price": 2800, "label": "Grosir 10pcs" },
-    { "min_qty": 50, "price": 2500, "label": "Grosir 50pcs" }
+    {
+      "id": "pt_a1b2",
+      "min_qty": 10,
+      "price": 2800,
+      "label": "Grosir 10pcs"
+    },
+    {
+      "min_qty": 50,
+      "price": 2500,
+      "label": "Grosir 50pcs"
+    }
   ]
 }
 ```
@@ -601,8 +827,17 @@ Update produk.
 ```json
 {
   "code": 200,
-  "message": "successfully",
-  "result": null
+  "message": "Product updated successfully",
+  "result": {
+    "id": "prd_i9j0k1l2",
+    "name": "Teh Kotak 250ml",
+    "sku": "TK-001",
+    "base_price": 3500,
+    "stock": 45,
+    "min_stock_threshold": 15,
+    "stock_status": "SAFE",
+    "updated_at": "2024-06-20T12:00:00Z"
+  }
 }
 ```
 
@@ -623,13 +858,19 @@ Update produk.
 
 Soft delete produk.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
-  "result": null
+  "message": "Product deactivated successfully",
+  "result": {
+    "id": "prd_i9j0k1l2",
+    "is_active": false,
+    "deleted_at": "2024-06-20T12:00:00Z"
+  }
 }
 ```
 
@@ -649,12 +890,14 @@ Soft delete produk.
 
 List semua kategori.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Successfully retrieved category list",
   "result": {
     "data": [
       {
@@ -675,7 +918,7 @@ List semua kategori.
     "metadata": {
       "pagination": {
         "current_page": 1,
-        "per_page": 50,
+        "page_size": 50,
         "total_pages": 1,
         "total_items": 2,
         "has_next_page": false,
@@ -694,7 +937,11 @@ List semua kategori.
 
 ---
 
-### 5.2 POST /categories (Owner only)
+### 5.2 POST /categories
+
+Tambah kategori baru (Owner only).
+
+**Headers:** `Authorization: Bearer <access_token>`
 
 **Request:**
 
@@ -703,6 +950,23 @@ List semua kategori.
   "name": "Snack",
   "color": "#FFE66D",
   "description": "Makanan ringan"
+}
+```
+
+**Success Response (201):**
+
+```json
+{
+  "code": 201,
+  "message": "Category created successfully",
+  "result": {
+    "id": "cat_snack",
+    "name": "Snack",
+    "color": "#FFE66D",
+    "description": "Makanan ringan",
+    "product_count": 0,
+    "created_at": "2024-06-20T10:30:00Z"
+  }
 }
 ```
 
@@ -715,11 +979,74 @@ List semua kategori.
 
 ---
 
+### 5.3 PUT /categories/:id
+
+Update kategori (Owner only).
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Request:**
+
+```json
+{
+  "name": "Makanan Ringan",
+  "color": "#FFD93D"
+}
+```
+
+**Success Response (200):**
+
+```json
+{
+  "code": 200,
+  "message": "Category updated successfully",
+  "result": {
+    "id": "cat_snack",
+    "name": "Makanan Ringan",
+    "color": "#FFD93D",
+    "product_count": 5,
+    "updated_at": "2024-06-20T12:00:00Z"
+  }
+}
+```
+
+**Business Logic & Rules:**
+
+- **Rule #1:** Partial update didukung.
+- **Rule #2:** `name` harus tetap unik. Jika duplikat dengan kategori lain, kembalikan 409.
+
+---
+
+### 5.4 DELETE /categories/:id
+
+Hapus kategori (Owner only).
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Success Response (200):**
+
+```json
+{
+  "code": 200,
+  "message": "Category deleted successfully",
+  "result": null
+}
+```
+
+**Business Logic & Rules:**
+
+- **Rule #1:** Kategori tidak bisa dihapus jika masih ada produk aktif. Jika ada, kembalikan 422.
+- **Rule #2:** Jika kategori dihapus, semua produk di kategori tersebut mendapat `category_id = NULL` (ON DELETE SET NULL).
+
+---
+
 ## 6. Transactions Module (Cashier Only)
 
 ### 6.1 POST /transactions
 
 Buat transaksi baru (checkout atau hold bill).
+
+**Headers:** `Authorization: Bearer <access_token>`
 
 **Request:**
 
@@ -757,8 +1084,8 @@ Buat transaksi baru (checkout atau hold bill).
 
 ```json
 {
-  "code": 200,
-  "message": "successfully",
+  "code": 201,
+  "message": "Transaction completed successfully",
   "result": {
     "id": "txn_q7r8s9t0",
     "transaction_code": "TRX-200624-0001",
@@ -802,8 +1129,8 @@ Buat transaksi baru (checkout atau hold bill).
 
 ```json
 {
-  "code": 200,
-  "message": "successfully",
+  "code": 201,
+  "message": "Hold bill created successfully",
   "result": {
     "id": "txn_q7r8s9t0",
     "transaction_code": "TRX-200624-0001",
@@ -814,10 +1141,26 @@ Buat transaksi baru (checkout atau hold bill).
       "id": "usr_e5f6g7h8",
       "name": "Siti Aminah"
     },
-    "items": [...],
-    "summary": { "subtotal": 90000, "total": 90000 },
+    "items": [
+      {
+        "id": "tmi_u1v2w3x4",
+        "product": {
+          "id": "prd_i9j0k1l2",
+          "name": "Teh Kotak",
+          "sku": "TK-001"
+        },
+        "qty": 12,
+        "unit_price": 2500,
+        "subtotal": 30000,
+        "notes": ""
+      }
+    ],
+    "summary": {
+      "subtotal": 90000,
+      "total": 90000
+    },
     "created_at": "2024-06-20T14:30:00Z"
-  },
+  }
 }
 ```
 
@@ -847,7 +1190,6 @@ Buat transaksi baru (checkout atau hold bill).
   ```
   BEGIN TRANSACTION;
   SELECT stock FROM products WHERE id = ? FOR UPDATE;
-  -- Verifikasi stok cukup (opsional, karena sistem toleran minus)
   UPDATE products SET stock = stock - ? WHERE id = ?;
   COMMIT;
   ```
@@ -875,26 +1217,29 @@ Buat transaksi baru (checkout atau hold bill).
 
 List transaksi dengan filter lengkap.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Query Parameters:**
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `status` | string | - | `completed`, `pending`, `cancelled`, `all` |
-| `type` | string | - | `direct`, `hold`, `all` |
-| `cashier_id` | string | - | Filter kasir |
-| `date_from` | date | - | Filter tanggal mulai (YYYY-MM-DD) |
-| `date_to` | date | - | Filter tanggal akhir (YYYY-MM-DD) |
-| `search` | string | - | Cari kode transaksi |
-| `page` | integer | 1 | Halaman |
-| `per_page` | integer | 20 | Item per halaman |
-| `sort_by` | string | `created_at` | `created_at`, `total`, `transaction_code` |
-| `sort_order` | string | `desc` | `asc`, `desc` |
+
+| Parameter    | Type    | Default      | Description                                |
+| :----------- | :------ | :----------- | :----------------------------------------- |
+| `status`     | string  | -            | `completed`, `pending`, `cancelled`, `all` |
+| `type`       | string  | -            | `direct`, `hold`, `all`                    |
+| `cashier_id` | string  | -            | Filter kasir                               |
+| `date_from`  | date    | -            | Filter tanggal mulai (YYYY-MM-DD)          |
+| `date_to`    | date    | -            | Filter tanggal akhir (YYYY-MM-DD)          |
+| `search`     | string  | -            | Cari kode transaksi                        |
+| `page`       | integer | 1            | Halaman                                    |
+| `page_size`  | integer | 20           | Item per halaman                           |
+| `sort_by`    | string  | `created_at` | `created_at`, `total`, `transaction_code`  |
+| `sort_order` | string  | `desc`       | `asc`, `desc`                              |
 
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Successfully retrieved transaction list",
   "result": {
     "data": [
       {
@@ -902,7 +1247,10 @@ List transaksi dengan filter lengkap.
         "transaction_code": "TRX-200624-0001",
         "type": "direct",
         "status": "COMPLETED",
-        "cashier": { "id": "usr_e5f6g7h8", "name": "Siti Aminah" },
+        "cashier": {
+          "id": "usr_e5f6g7h8",
+          "name": "Siti Aminah"
+        },
         "item_count": 3,
         "total": 90000,
         "payment_method": "cash",
@@ -912,13 +1260,16 @@ List transaksi dengan filter lengkap.
     "metadata": {
       "pagination": {
         "current_page": 1,
-        "per_page": 20,
+        "page_size": 20,
         "total_pages": 5,
         "total_items": 98,
         "has_next_page": true,
         "has_prev_page": false
       },
-      "sort": { "field": "created_at", "direction": "desc" },
+      "sort": {
+        "field": "created_at",
+        "direction": "desc"
+      },
       "filters": {
         "status": "all",
         "type": "all",
@@ -947,18 +1298,23 @@ List transaksi dengan filter lengkap.
 
 Detail transaksi lengkap.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Successfully retrieved transaction details",
   "result": {
     "id": "txn_q7r8s9t0",
     "transaction_code": "TRX-200624-0001",
     "type": "direct",
     "status": "COMPLETED",
-    "cashier": { "id": "usr_e5f6g7h8", "name": "Siti Aminah" },
+    "cashier": {
+      "id": "usr_e5f6g7h8",
+      "name": "Siti Aminah"
+    },
     "items": [
       {
         "id": "tmi_u1v2w3x4",
@@ -1003,6 +1359,8 @@ Detail transaksi lengkap.
 
 Return item dari transaksi.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Request:**
 
 ```json
@@ -1022,7 +1380,7 @@ Return item dari transaksi.
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Return processed successfully",
   "result": {
     "transaction_id": "txn_q7r8s9t0",
     "returned_items": [
@@ -1074,6 +1432,8 @@ Return item dari transaksi.
 
 Lanjutkan hold bill ke pembayaran.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Request:**
 
 ```json
@@ -1091,11 +1451,16 @@ Lanjutkan hold bill ke pembayaran.
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Hold bill completed successfully",
   "result": {
     "id": "txn_q7r8s9t0",
+    "transaction_code": "TRX-200624-0001",
     "status": "COMPLETED",
-    "payment": { "method": "cash", "amount_paid": 100000, "change": 10000 },
+    "payment": {
+      "method": "cash",
+      "amount_paid": 100000,
+      "change": 10000
+    },
     "completed_at": "2024-06-20T15:15:00Z"
   }
 }
@@ -1116,19 +1481,24 @@ Lanjutkan hold bill ke pembayaran.
 
 List hold bill aktif.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
-  "resutl": {
+  "message": "Successfully retrieved hold bills",
+  "result": {
     "data": [
       {
         "id": "txn_q7r8s9t0",
         "transaction_code": "TRX-200624-0001",
         "hold_note": "Meja 5 / Andi",
-        "cashier": { "id": "usr_e5f6g7h8", "name": "Siti Aminah" },
+        "cashier": {
+          "id": "usr_e5f6g7h8",
+          "name": "Siti Aminah"
+        },
         "item_count": 3,
         "total": 90000,
         "held_at": "2024-06-20T14:30:00Z",
@@ -1138,7 +1508,7 @@ List hold bill aktif.
     "metadata": {
       "pagination": {
         "current_page": 1,
-        "per_page": 20,
+        "page_size": 20,
         "total_pages": 1,
         "total_items": 3,
         "has_next_page": false,
@@ -1165,59 +1535,61 @@ List hold bill aktif.
 
 Laporan penjualan dengan aggregasi.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Query Parameters:**
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `period` | string | `daily` | `daily`, `weekly`, `monthly`, `yearly` |
-| `date_from` | date | - | Tanggal mulai |
-| `date_to` | date | - | Tanggal akhir |
-| `cashier_id` | string | - | Filter per kasir |
-| `group_by` | string | `date` | `date`, `cashier`, `product`, `category` |
+
+| Parameter    | Type   | Default | Description                              |
+| :----------- | :----- | :------ | :--------------------------------------- |
+| `period`     | string | `daily` | `daily`, `weekly`, `monthly`, `yearly`   |
+| `date_from`  | date   | -       | Tanggal mulai (YYYY-MM-DD)               |
+| `date_to`    | date   | -       | Tanggal akhir (YYYY-MM-DD)               |
+| `cashier_id` | string | -       | Filter per kasir                         |
+| `group_by`   | string | `date`  | `date`, `cashier`, `product`, `category` |
 
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Successfully retrieved sales report",
   "result": {
-    "data": {
-      "summary": {
-        "total_revenue": 1545000,
-        "total_transactions": 47,
-        "average_transaction_value": 32872,
-        "total_items_sold": 156
-      },
-      "breakdown": [
-        {
-          "date": "2024-06-20",
-          "revenue": 945000,
-          "transaction_count": 28,
-          "items_sold": 89
-        },
-        {
-          "date": "2024-06-19",
-          "revenue": 600000,
-          "transaction_count": 19,
-          "items_sold": 67
-        }
-      ],
-      "cashier_performance": [
-        {
-          "cashier_id": "usr_e5f6g7h8",
-          "cashier_name": "Siti Aminah",
-          "total_revenue": 945000,
-          "transaction_count": 28
-        }
-      ]
+    "summary": {
+      "total_revenue": 1545000,
+      "total_transactions": 47,
+      "average_transaction_value": 32872,
+      "total_items_sold": 156
     },
-    "metadata": {
-      "filters": {
-        "period": "daily",
-        "date_from": "2024-06-19",
-        "date_to": "2024-06-20",
-        "cashier_id": ""
+    "breakdown": [
+      {
+        "date": "2024-06-20",
+        "revenue": 945000,
+        "transaction_count": 28,
+        "items_sold": 89
+      },
+      {
+        "date": "2024-06-19",
+        "revenue": 600000,
+        "transaction_count": 19,
+        "items_sold": 67
       }
+    ],
+    "cashier_performance": [
+      {
+        "cashier_id": "usr_e5f6g7h8",
+        "cashier_name": "Siti Aminah",
+        "total_revenue": 945000,
+        "transaction_count": 28
+      }
+    ]
+  },
+  "metadata": {
+    "filters": {
+      "period": "daily",
+      "date_from": "2024-06-19",
+      "date_to": "2024-06-20",
+      "cashier_id": "",
+      "group_by": "date"
     }
   }
 }
@@ -1261,12 +1633,14 @@ Laporan penjualan dengan aggregasi.
 
 Notifikasi stok menipis dan minus.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Successfully retrieved stock alerts",
   "result": {
     "critical_count": 2,
     "low_count": 5,
@@ -1310,29 +1684,38 @@ Notifikasi stok menipis dan minus.
 
 Audit trail pembatalan/return.
 
+**Headers:** `Authorization: Bearer <access_token>`
+
 **Query Parameters:**
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `cashier_id` | string | - | Filter kasir |
-| `date_from` | date | - | Filter tanggal |
-| `date_to` | date | - | Filter tanggal |
-| `page` | integer | 1 | Halaman |
-| `per_page` | integer | 20 | Item per halaman |
+
+| Parameter    | Type    | Default | Description      |
+| :----------- | :------ | :------ | :--------------- |
+| `cashier_id` | string  | -       | Filter kasir     |
+| `date_from`  | date    | -       | Filter tanggal   |
+| `date_to`    | date    | -       | Filter tanggal   |
+| `page`       | integer | 1       | Halaman          |
+| `page_size`  | integer | 20      | Item per halaman |
 
 **Success Response (200):**
 
 ```json
 {
   "code": 200,
-  "message": "successfully",
+  "message": "Successfully retrieved void logs",
   "result": {
     "data": [
       {
         "id": "vld_y5z6a7b8",
         "transaction_id": "txn_q7r8s9t0",
         "transaction_code": "TRX-200624-0001",
-        "cashier": { "id": "usr_e5f6g7h8", "name": "Siti Aminah" },
-        "product": { "id": "prd_i9j0k1l2", "name": "Teh Kotak" },
+        "cashier": {
+          "id": "usr_e5f6g7h8",
+          "name": "Siti Aminah"
+        },
+        "product": {
+          "id": "prd_i9j0k1l2",
+          "name": "Teh Kotak"
+        },
         "qty_returned": 2,
         "refund_amount": 5000,
         "reason": "Produk rusak",
@@ -1342,13 +1725,17 @@ Audit trail pembatalan/return.
     "metadata": {
       "pagination": {
         "current_page": 1,
-        "per_page": 20,
+        "page_size": 20,
         "total_pages": 2,
         "total_items": 35,
         "has_next_page": true,
         "has_prev_page": false
       },
-      "filters": { "cashier_id": "", "date_from": "", "date_to": "" }
+      "filters": {
+        "cashier_id": "",
+        "date_from": "",
+        "date_to": ""
+      }
     }
   }
 }
@@ -1371,21 +1758,23 @@ Audit trail pembatalan/return.
 
 |  #  | Aturan                                       | Modul       | Keterangan                     |
 | :-: | -------------------------------------------- | ----------- | ------------------------------ |
-|  1  | JWT di `httpOnly` cookie                     | Auth        | Mitigasi XSS attack            |
-|  2  | bcrypt(cost=12) untuk password               | Auth        | Hashing aman                   |
-|  3  | Rate limit 5x login gagal per 15 menit       | Auth        | Mencegah brute force           |
-|  4  | `cashier_id` diambil dari JWT, bukan body    | Transaksi   | Audit trail akurat             |
-|  5  | `sku` dan `barcode` immutable setelah dibuat | Produk      | Integritas referensi           |
-|  6  | Harga grosir < harga dasar                   | Produk      | Logika bisnis grosir           |
-|  7  | `min_qty` tier harus > 1                     | Produk      | Harga dasar untuk qty 1        |
-|  8  | Stok dipotong saat hold bill dibuat          | Transaksi   | Mencegah double sell           |
-|  9  | Transaksi tidak diblokir meski stok minus    | Transaksi   | Fitur toleransi stok           |
-| 10  | `SELECT FOR UPDATE` untuk stok               | Transaksi   | Mencegah race condition        |
-| 11  | Return hanya untuk transaksi COMPLETED       | Return/Void | Hold bill tidak bisa di-return |
-| 12  | Refund pakai harga saat transaksi            | Return/Void | Bukan harga sekarang           |
-| 13  | Void logs immutable                          | Audit       | Tidak bisa edit/delete         |
-| 14  | Soft delete untuk users & products           | Global      | Data historis tetap ada        |
-| 15  | Owner tidak bisa hapus dirinya sendiri       | Users       | Mencegah lockout               |
+|  1  | JWT di `Authorization: Bearer` header        | Auth        | Access token via header        |
+|  2  | Refresh token di `httpOnly` cookie           | Auth        | Refresh token via cookie       |
+|  3  | JWT payload: sub, role, type, iat, exp, jti  | Auth        | Standard + type + role         |
+|  4  | bcrypt(cost=12) untuk password               | Auth        | Hashing aman                   |
+|  5  | Rate limit 5x login gagal per 15 menit       | Auth        | Mencegah brute force           |
+|  6  | `cashier_id` diambil dari JWT, bukan body    | Transaksi   | Audit trail akurat             |
+|  7  | `sku` dan `barcode` immutable setelah dibuat | Produk      | Integritas referensi           |
+|  8  | Harga grosir < harga dasar                   | Produk      | Logika bisnis grosir           |
+|  9  | `min_qty` tier harus > 1                     | Produk      | Harga dasar untuk qty 1        |
+| 10  | Stok dipotong saat hold bill dibuat          | Transaksi   | Mencegah double sell           |
+| 11  | Transaksi tidak diblokir meski stok minus    | Transaksi   | Fitur toleransi stok           |
+| 12  | `SELECT FOR UPDATE` untuk stok               | Transaksi   | Mencegah race condition        |
+| 13  | Return hanya untuk transaksi COMPLETED       | Return/Void | Hold bill tidak bisa di-return |
+| 14  | Refund pakai harga saat transaksi            | Return/Void | Bukan harga sekarang           |
+| 15  | Void logs immutable                          | Audit       | Tidak bisa edit/delete         |
+| 16  | Soft delete untuk users & products           | Global      | Data historis tetap ada        |
+| 17  | Owner tidak bisa hapus dirinya sendiri       | Users       | Mencegah lockout               |
 
 ### 9.2 State Machine Transaksi
 
@@ -1434,19 +1823,16 @@ RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.stock < 0 THEN
         NEW.stock_status := 'MINUS';
-        -- Insert stock alert MINUS
         INSERT INTO stock_alerts (product_id, alert_type, stock_at_alert)
         VALUES (NEW.id, 'MINUS', NEW.stock)
         ON CONFLICT DO NOTHING;
     ELSIF NEW.stock <= NEW.min_stock_threshold THEN
         NEW.stock_status := 'LOW';
-        -- Insert stock alert LOW
         INSERT INTO stock_alerts (product_id, alert_type, stock_at_alert)
         VALUES (NEW.id, 'LOW', NEW.stock)
         ON CONFLICT DO NOTHING;
     ELSE
         NEW.stock_status := 'SAFE';
-        -- Resolve existing alerts
         UPDATE stock_alerts
         SET is_resolved = true, resolved_at = NOW()
         WHERE product_id = NEW.id AND is_resolved = false;
@@ -1476,6 +1862,8 @@ $$ LANGUAGE plpgsql;
 | `DELETE /products/:id`            | Yes   | No      | Owner Only    | Soft delete produk                    |
 | `GET /categories`                 | Yes   | Yes     | Authenticated | List kategori                         |
 | `POST /categories`                | Yes   | No      | Owner Only    | Tambah kategori                       |
+| `PUT /categories/:id`             | Yes   | No      | Owner Only    | Update kategori                       |
+| `DELETE /categories/:id`          | Yes   | No      | Owner Only    | Hapus kategori                        |
 | `POST /transactions`              | No    | Yes     | Cashier Only  | Buat transaksi/checkout               |
 | `GET /transactions`               | Yes   | Yes     | Authenticated | Kasir: milik sendiri. Owner: semua.   |
 | `GET /transactions/:id`           | Yes   | Yes     | Authenticated | Kasir: milik sendiri. Owner: semua.   |
@@ -1492,14 +1880,9 @@ Semua error response mengikuti format berikut:
 
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE_UPPERCASE",
-    "message": "Pesan error yang human-readable",
-    "details": [{ "field": "field_name", "message": "Pesan spesifik field" }],
-    "timestamp": "2024-06-20T10:30:00Z",
-    "request_id": "req_abc123xyz"
-  }
+  "code": 400,
+  "message": "Validation failed",
+  "error": "string"
 }
 ```
 
@@ -1562,7 +1945,7 @@ Semua error response mengikuti format berikut:
                                     |
                                     v
 +---------------------------------------------------------------------+
-| 5. DATABASE TRANSACTION (ACID)                                     |
+| 5. DATABASE TRANSACTION (ACID)                                   |
 |    BEGIN SERIALIZABLE;                                             |
 |    |                                                               |
 |    |-- INSERT INTO transactions (...)                              |
@@ -1622,13 +2005,13 @@ Semua error response mengikuti format berikut:
                                     |
                                     v
 +---------------------------------------------------------------------+
-| 4. DATABASE TRANSACTION (ACID)                                     |
+| 4. DATABASE TRANSACTION (ACID)                                   |
 |    BEGIN SERIALIZABLE;                                             |
 |    |                                                               |
 |    |-- SELECT stock FROM products WHERE id = ? FOR UPDATE          |
 |    |                                                               |
 |    |-- INSERT INTO void_logs (...)                                 |
-|    |   -> cashier_id = user yang login (bukan pembuat transaksi)  |
+|    |   -> cashier_id = user yang login (bukan pembuat transaksi) |
 |    |                                                               |
 |    |-- UPDATE products SET stock = stock + qty_returned            |
 |    |                                                               |
@@ -1650,5 +2033,5 @@ Semua error response mengikuti format berikut:
 ---
 
 **Dokumen ini merupakan kontrak API lengkap untuk Smart Cost V1.**
-**Versi:** 1.0
-**Terakhir Diperbarui:** Juni 2026
+**Versi:** 1.1
+**Terakhir Diperbarui:** Juli 2026

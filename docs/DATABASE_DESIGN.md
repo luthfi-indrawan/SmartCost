@@ -1,7 +1,7 @@
 # Database Design Document (DATABASE_DESIGN) - Smart Cost V1
 
-**Versi:** 1.0  
-**Status:** Draft Disetujui  
+**Versi:** 1.1  
+**Status:** Regenerated & Synced with PRD  
 **DBMS:** PostgreSQL 15  
 **ORM:** GORM v2 (Go) / Raw SQL dengan `pgx`
 
@@ -13,6 +13,14 @@
 erDiagram
     USERS ||--o{ TRANSACTIONS : creates
     USERS ||--o{ VOID_LOGS : performs
+    CATEGORIES ||--o{ PRODUCTS : categorizes
+    PRODUCTS ||--o{ PRODUCT_PRICES : has
+    PRODUCTS ||--o{ TRANSACTION_ITEMS : contains
+    PRODUCTS ||--o{ VOID_LOGS : referenced
+    PRODUCTS ||--o{ STOCK_ALERTS : triggers
+    TRANSACTIONS ||--o{ TRANSACTION_ITEMS : contains
+    TRANSACTIONS ||--o{ VOID_LOGS : referenced
+
     USERS {
         uuid id PK
         varchar name
@@ -26,7 +34,6 @@ erDiagram
         timestamp deleted_at
     }
 
-    CATEGORIES ||--o{ PRODUCTS : categorizes
     CATEGORIES {
         uuid id PK
         varchar name UK
@@ -37,9 +44,6 @@ erDiagram
         timestamp updated_at
     }
 
-    PRODUCTS ||--o{ PRODUCT_PRICES : has
-    PRODUCTS ||--o{ TRANSACTION_ITEMS : contains
-    PRODUCTS ||--o{ VOID_LOGS : referenced
     PRODUCTS {
         uuid id PK
         varchar name
@@ -68,8 +72,6 @@ erDiagram
         timestamp updated_at
     }
 
-    TRANSACTIONS ||--o{ TRANSACTION_ITEMS : contains
-    TRANSACTIONS ||--o{ VOID_LOGS : referenced
     TRANSACTIONS {
         uuid id PK
         varchar transaction_code UK
@@ -110,9 +112,9 @@ erDiagram
         int refund_amount
         text reason
         timestamp created_at
+        timestamp updated_at
     }
 
-    STOCK_ALERTS ||--o{ PRODUCTS : monitors
     STOCK_ALERTS {
         uuid id PK
         uuid product_id FK
@@ -121,8 +123,21 @@ erDiagram
         boolean is_resolved
         timestamp resolved_at
         timestamp created_at
+        timestamp updated_at
     }
 ```
+
+### ERD Notes
+
+- **USERS → TRANSACTIONS:** One-to-Many. Satu kasir bisa membuat banyak transaksi.
+- **USERS → VOID_LOGS:** One-to-Many. Satu kasir bisa melakukan banyak return/void.
+- **CATEGORIES → PRODUCTS:** One-to-Many. Satu kategori bisa memiliki banyak produk. `ON DELETE SET NULL`.
+- **PRODUCTS → PRODUCT_PRICES:** One-to-Many. Satu produk bisa memiliki banyak price tiers. `ON DELETE CASCADE`.
+- **PRODUCTS → TRANSACTION_ITEMS:** One-to-Many. Satu produk bisa muncul di banyak transaksi. `ON DELETE RESTRICT`.
+- **PRODUCTS → VOID_LOGS:** One-to-Many. Satu produk bisa di-return banyak kali. `ON DELETE RESTRICT`.
+- **PRODUCTS → STOCK_ALERTS:** One-to-Many. Satu produk bisa memiliki banyak alert histori. `ON DELETE CASCADE`.
+- **TRANSACTIONS → TRANSACTION_ITEMS:** One-to-Many. Satu transaksi bisa memiliki banyak item. `ON DELETE CASCADE`.
+- **TRANSACTIONS → VOID_LOGS:** One-to-Many. Satu transaksi bisa memiliki banyak return log. `ON DELETE CASCADE`.
 
 ---
 
@@ -234,6 +249,7 @@ erDiagram
 | `refund_amount`       | INTEGER   | NOT NULL                                      | Nominal refund       |
 | `reason`              | TEXT      | NOT NULL                                      | Alasan return        |
 | `created_at`          | TIMESTAMP | NOT NULL, DEFAULT NOW()                       | Waktu return         |
+| `updated_at`          | TIMESTAMP | NOT NULL, DEFAULT NOW()                       | Waktu update         |
 
 ### 2.8 Table: `stock_alerts`
 
@@ -246,58 +262,182 @@ erDiagram
 | `is_resolved`    | BOOLEAN              | NOT NULL, DEFAULT false              | Status resolved        |
 | `resolved_at`    | TIMESTAMP            | NULL                                 | Waktu resolve          |
 | `created_at`     | TIMESTAMP            | NOT NULL, DEFAULT NOW()              | Waktu alert            |
+| `updated_at`     | TIMESTAMP            | NOT NULL, DEFAULT NOW()              | Waktu update           |
 
 ---
 
-## 3. Performance Optimization Plan
+## 3. Database Triggers
 
-### 3.1 Indexing Strategy
+### 3.1 Stock Status Auto-Update Trigger
+
+```sql
+CREATE OR REPLACE FUNCTION update_stock_status()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.stock < 0 THEN
+        NEW.stock_status := 'MINUS';
+        -- Insert stock alert MINUS (hanya jika belum ada alert aktif)
+        INSERT INTO stock_alerts (product_id, alert_type, stock_at_alert)
+        SELECT NEW.id, 'MINUS', NEW.stock
+        WHERE NOT EXISTS (
+            SELECT 1 FROM stock_alerts 
+            WHERE product_id = NEW.id 
+            AND alert_type = 'MINUS' 
+            AND is_resolved = false
+        );
+    ELSIF NEW.stock <= NEW.min_stock_threshold THEN
+        NEW.stock_status := 'LOW';
+        -- Insert stock alert LOW (hanya jika belum ada alert aktif)
+        INSERT INTO stock_alerts (product_id, alert_type, stock_at_alert)
+        SELECT NEW.id, 'LOW', NEW.stock
+        WHERE NOT EXISTS (
+            SELECT 1 FROM stock_alerts 
+            WHERE product_id = NEW.id 
+            AND alert_type = 'LOW' 
+            AND is_resolved = false
+        );
+    ELSE
+        NEW.stock_status := 'SAFE';
+        -- Resolve existing alerts
+        UPDATE stock_alerts
+        SET is_resolved = true, resolved_at = NOW()
+        WHERE product_id = NEW.id AND is_resolved = false;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_stock_status
+BEFORE INSERT OR UPDATE OF stock ON products
+FOR EACH ROW
+EXECUTE FUNCTION update_stock_status();
+```
+
+### 3.2 Product Count Auto-Update Trigger
+
+```sql
+CREATE OR REPLACE FUNCTION update_category_product_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- On INSERT
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.category_id IS NOT NULL AND NEW.deleted_at IS NULL THEN
+            UPDATE categories SET product_count = product_count + 1 WHERE id = NEW.category_id;
+        END IF;
+        RETURN NEW;
+
+    -- On UPDATE
+    ELSIF TG_OP = 'UPDATE' THEN
+        -- Category changed
+        IF NEW.category_id IS DISTINCT FROM OLD.category_id THEN
+            -- Decrement old category
+            IF OLD.category_id IS NOT NULL THEN
+                UPDATE categories SET product_count = product_count - 1 WHERE id = OLD.category_id;
+            END IF;
+            -- Increment new category
+            IF NEW.category_id IS NOT NULL AND NEW.deleted_at IS NULL THEN
+                UPDATE categories SET product_count = product_count + 1 WHERE id = NEW.category_id;
+            END IF;
+        END IF;
+
+        -- Soft delete / restore
+        IF NEW.deleted_at IS DISTINCT FROM OLD.deleted_at THEN
+            IF NEW.deleted_at IS NOT NULL AND NEW.category_id IS NOT NULL THEN
+                UPDATE categories SET product_count = product_count - 1 WHERE id = NEW.category_id;
+            ELSIF NEW.deleted_at IS NULL AND NEW.category_id IS NOT NULL THEN
+                UPDATE categories SET product_count = product_count + 1 WHERE id = NEW.category_id;
+            END IF;
+        END IF;
+        RETURN NEW;
+
+    -- On DELETE (hard delete - should not happen with soft delete)
+    ELSIF TG_OP = 'DELETE' THEN
+        IF OLD.category_id IS NOT NULL THEN
+            UPDATE categories SET product_count = product_count - 1 WHERE id = OLD.category_id;
+        END IF;
+        RETURN OLD;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_product_count
+AFTER INSERT OR UPDATE OR DELETE ON products
+FOR EACH ROW
+EXECUTE FUNCTION update_category_product_count();
+```
+
+### 3.3 Transaction Code Generation Function
+
+```sql
+CREATE OR REPLACE FUNCTION generate_transaction_code()
+RETURNS TRIGGER AS $$
+DECLARE
+    date_part VARCHAR(6);
+    seq_num INTEGER;
+    new_code VARCHAR(20);
+BEGIN
+    date_part := TO_CHAR(NEW.created_at, 'YYMMDD');
+
+    -- Get next sequence number for today
+    SELECT COALESCE(MAX(CAST(SUBSTRING(transaction_code FROM 12) AS INTEGER)), 0) + 1
+    INTO seq_num
+    FROM transactions
+    WHERE transaction_code LIKE 'TRX-' || date_part || '-%';
+
+    new_code := 'TRX-' || date_part || '-' || LPAD(seq_num::TEXT, 4, '0');
+    NEW.transaction_code := new_code;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_generate_transaction_code
+BEFORE INSERT ON transactions
+FOR EACH ROW
+EXECUTE FUNCTION generate_transaction_code();
+```
+
+---
+
+## 4. Performance Optimization Plan
+
+### 4.1 Indexing Strategy
 
 | Table               | Index Name                  | Columns                    | Type           | Purpose                 |
 | :------------------ | :-------------------------- | :------------------------- | :------------- | :---------------------- |
 | `users`             | `idx_users_email`           | `email`                    | B-Tree, UNIQUE | Fast login lookup       |
 | `users`             | `idx_users_role`            | `role`                     | B-Tree         | Filter owner/cashier    |
+| `users`             | `idx_users_deleted_at`      | `deleted_at`               | B-Tree         | Soft delete filter      |
+| `categories`        | `idx_categories_name`       | `name`                     | B-Tree, UNIQUE | Name uniqueness         |
 | `products`          | `idx_products_sku`          | `sku`                      | B-Tree, UNIQUE | SKU uniqueness          |
 | `products`          | `idx_products_barcode`      | `barcode`                  | B-Tree, UNIQUE | Barcode scan            |
 | `products`          | `idx_products_category`     | `category_id`              | B-Tree         | Category filter         |
 | `products`          | `idx_products_stock_status` | `stock_status`             | B-Tree         | Dashboard alerts        |
+| `products`          | `idx_products_active`       | `is_active`, `deleted_at`  | B-Tree         | Active product filter   |
 | `products`          | `idx_products_search`       | `name`, `sku`, `barcode`   | GIN (pg_trgm)  | Fuzzy search kasir      |
 | `product_prices`    | `idx_prices_product_qty`    | `product_id`, `min_qty`    | B-Tree         | Price tier lookup       |
 | `transactions`      | `idx_txn_code`              | `transaction_code`         | B-Tree, UNIQUE | Code lookup             |
 | `transactions`      | `idx_txn_cashier`           | `cashier_id`               | B-Tree         | Cashier performance     |
-| `transactions`      | `idx_txn_status`            | `status`                   | B-Tree         | Hold bill filter        |
+| `transactions`      | `idx_txn_status`          | `status`                   | B-Tree         | Hold bill filter        |
+| `transactions`      | `idx_txn_type_status`       | `type`, `status`           | B-Tree         | Hold bill list          |
 | `transactions`      | `idx_txn_created`           | `created_at`               | B-Tree         | Date range reports      |
 | `transactions`      | `idx_txn_date_cashier`      | `created_at`, `cashier_id` | B-Tree         | Composite report filter |
 | `transaction_items` | `idx_items_transaction`     | `transaction_id`           | B-Tree         | Transaction detail      |
 | `transaction_items` | `idx_items_product`         | `product_id`               | B-Tree         | Product sales stats     |
 | `void_logs`         | `idx_void_cashier`          | `cashier_id`               | B-Tree         | Audit filter            |
+| `void_logs`         | `idx_void_transaction`      | `transaction_id`           | B-Tree         | Transaction void lookup |
 | `void_logs`         | `idx_void_created`          | `created_at`               | B-Tree         | Date range audit        |
+| `stock_alerts`      | `idx_alert_product`         | `product_id`               | B-Tree         | Product alert lookup    |
 | `stock_alerts`      | `idx_alert_resolved`        | `is_resolved`              | B-Tree         | Unresolved alerts       |
+| `stock_alerts`      | `idx_alert_type_created`    | `alert_type`, `created_at` | B-Tree         | Alert sorting           |
 
-### 3.2 Optimization Policies
+### 4.2 Optimization Policies
 
-1. **Computed Column `stock_status`:** Kolom `stock_status` di tabel `products` di-update via database trigger setiap kali `stock` berubah, menghindari perhitungan runtime:
+1. **Computed Column `stock_status`:** Kolom `stock_status` di tabel `products` di-update via database trigger setiap kali `stock` berubah, menghindari perhitungan runtime.
 
+2. **Transaction Isolation:** Semua operasi pemotongan stok menggunakan `REPEATABLE READ` isolation level dengan `SELECT FOR UPDATE` untuk mencegah race condition:
    ```sql
-   CREATE OR REPLACE FUNCTION update_stock_status()
-   RETURNS TRIGGER AS $$
-   BEGIN
-       IF NEW.stock < 0 THEN
-           NEW.stock_status := 'MINUS';
-       ELSIF NEW.stock <= NEW.min_stock_threshold THEN
-           NEW.stock_status := 'LOW';
-       ELSE
-           NEW.stock_status := 'SAFE';
-       END IF;
-       RETURN NEW;
-   END;
-   $$ LANGUAGE plpgsql;
-   ```
-
-2. **Transaction Isolation:** Semua operasi pemotongan stok menggunakan `SERIALIZABLE` isolation level untuk mencegah race condition:
-
-   ```sql
-   BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+   BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
    SELECT stock FROM products WHERE id = ? FOR UPDATE;
    UPDATE products SET stock = stock - ? WHERE id = ?;
    COMMIT;
@@ -307,11 +447,13 @@ erDiagram
 
 4. **Read Replicas:** Untuk reporting (`/reports/*`), query diarahkan ke read replica PostgreSQL untuk mengurangi beban primary.
 
+5. **Partitioning (Future):** Tabel `transactions` dan `transaction_items` bisa di-partition berdasarkan `created_at` (monthly) jika data sudah > 1 juta records.
+
 ---
 
-## 4. Data Seeding Specifications
+## 5. Data Seeding Specifications
 
-### 4.1 Seed Script Structure
+### 5.1 Seed Script Structure
 
 ```go
 // cmd/seed/main.go
@@ -379,7 +521,7 @@ func main() {
 }
 ```
 
-### 4.2 Mock Transaction Data (Development Only)
+### 5.2 Mock Transaction Data (Development Only)
 
 ```go
 // Generate 100 mock transactions for dashboard testing
@@ -401,3 +543,48 @@ for i := 0; i < 100; i++ {
     tx.ChangeAmount = tx.AmountPaid - tx.Total
 }
 ```
+
+---
+
+## 6. Migration Strategy
+
+### 6.1 Migration Files Structure
+
+```
+migrations/
+├── 001_create_users_table.sql
+├── 002_create_categories_table.sql
+├── 003_create_products_table.sql
+├── 004_create_product_prices_table.sql
+├── 005_create_transactions_table.sql
+├── 006_create_transaction_items_table.sql
+├── 007_create_void_logs_table.sql
+├── 008_create_stock_alerts_table.sql
+├── 009_create_triggers.sql
+├── 010_create_indexes.sql
+└── 011_seed_data.sql
+```
+
+### 6.2 Migration Tool
+
+Menggunakan `golang-migrate/migrate` atau `pressly/goose` untuk version-controlled database migrations.
+
+```bash
+# Install goose
+go install github.com/pressly/goose/v3/cmd/goose@latest
+
+# Create new migration
+goose create add_user_phone_column sql
+
+# Run migrations
+goose postgres "postgres://user:pass@localhost/smartcost?sslmode=disable" up
+
+# Rollback
+goose postgres "postgres://user:pass@localhost/smartcost?sslmode=disable" down
+```
+
+---
+
+**Dokumen ini merupakan spesifikasi database lengkap untuk Smart Cost V1.**
+**Versi:** 1.1
+**Terakhir Diperbarui:** Juli 2026
