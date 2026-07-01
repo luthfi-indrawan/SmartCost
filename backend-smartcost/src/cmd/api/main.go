@@ -120,10 +120,10 @@ func main() {
 	storageClient := storage_go.NewClient(cfg.Supabase.URL, cfg.Supabase.SecretAccessKey, nil)
 
 	// init helper
-	helper := helper.NewHelper()
+	helper := helper.NewHelper(cfg)
 
 	// init middleware
-	middleware := middleware.NewMiddleware(cfg)
+	middleware := middleware.NewMiddleware(cfg, helper)
 
 	// setup gin
 	gin.SetMode(gin.ReleaseMode)
