@@ -2,6 +2,7 @@ package handler
 
 import (
 	"backend-smartcost/src/modules/auth/controller"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -26,9 +27,12 @@ func (h *Handler) LoginHandler(c *gin.Context) {
 	})
 
 	if err != nil {
+		fmt.Printf("error on controller: %v", err)
 		h.helper.ParsePostgresError(c, err, requestID)
 		return
 	}
+
+	h.helper.SetCookieRefreshToken(c, result.Session.RefreshToken, result.Session.RefreshTokenExpiresAt)
 
 	h.helper.BuildSuccessResponse(c, http.StatusOK, "login successfully", result)
 }

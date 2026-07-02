@@ -2,6 +2,7 @@ package handler
 
 import (
 	"backend-smartcost/src/modules/auth/controller"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,23 +10,14 @@ import (
 
 func (h *Handler) MeHandler(c *gin.Context) {
 	requestID := h.helper.GetRequestID(c)
-	
-	var parsedBody DTOLogin
-	if err := c.ShouldBindJSON(&parsedBody); err != nil {
-		h.helper.BuildErrorResponse(
-			c, http.StatusBadRequest, 
-			"invalid request body", 
-			err.Error(), requestID,
-		)
-		return
-	}
+	userID := h.helper.GetUserID(c)
 
-	result, err := h.controller.Login(c.Request.Context(), &controller.RequestLogin{
-		Email: parsedBody.Email,
-		Password: parsedBody.Password,
+	result, err := h.controller.Me(c.Request.Context(), &controller.RequestMe{
+		UserID: userID,
 	})
 
 	if err != nil {
+		fmt.Printf("error on controller: %v", err)
 		h.helper.ParsePostgresError(c, err, requestID)
 		return
 	}

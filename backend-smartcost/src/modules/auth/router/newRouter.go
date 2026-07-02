@@ -16,6 +16,6 @@ func New(
 
 	g.POST("/login", middleware.RateLimiter(), handler.LoginHandler)
 	g.POST("/logout", middleware.Auth(), handler.LogoutHandler)
-	g.POST("/refresh", middleware.Auth(), handler.RefreshHandler)
+	g.POST("/refresh", handler.RefreshHandler)
 	g.GET("/me", middleware.Auth(), handler.MeHandler)
 }

@@ -1,6 +1,9 @@
 package controller
 
-import "time"
+import (
+	"backend-smartcost/src/types"
+	"time"
+)
 
 // login
 type (
@@ -10,15 +13,16 @@ type (
 	}
 
 	ResponseLogin struct {
-		User User `json:"user"`
-		Session Session `json:"session"`
+		User types.UserType `json:"user"`
+		Session types.SessionType `json:"session"`
 	}
 )
 
 // logout
 type (
 	RequestLogout struct {
-		JTI string
+		AccessTokenID string
+		RefreshToken string
 	}
 
 	ResponseLogout struct{}
@@ -31,6 +35,7 @@ type (
 	}
 
 	ResponseRefresh struct {
+		AccessToken string `json:"acccess_token"`
 		AccessTokenExpiresAt time.Time
 	}
 )
@@ -42,24 +47,6 @@ type (
 	}
 
 	ResponseMe struct {
-		User
-	}
-)
-
-// model
-type (
-	User struct {
-		ID string `json:"id"`
-		Name string `json:"name"`
-		Email string `json:"email"`
-		Role string `json:"role"`
-		AvatarURL string `json:"avatar_url"`
-		Premissions []string `json:"premissions"`
-		CreatedAt time.Time `json:"created_at"`
-	}
-
-	Session struct {
-		AccessTokenExpiresAt time.Time `json:"access_token_expires_at"`
-		RefreshTokenExpiresAt time.Time `json:"refresh_token_expires_at"`
+		types.UserType
 	}
 )

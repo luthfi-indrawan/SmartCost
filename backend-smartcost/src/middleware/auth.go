@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"backend-smartcost/src/constants"
 	"net/http"
 	"strings"
 
@@ -49,7 +50,7 @@ func (m *Middleware) Auth() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := m.helper.JWTValidate(tokenString)
+		claims, err := m.helper.JWTValidate(c.Request.Context(), tokenString)
 
 		if err != nil {
 			m.helper.BuildErrorResponse(
@@ -63,7 +64,7 @@ func (m *Middleware) Auth() gin.HandlerFunc {
 			return
 		}
 
-		if claims.Type != "access" {
+		if claims.Type != constants.AccessType {
 			m.helper.BuildErrorResponse(
 				c,
 				http.StatusUnauthorized,
@@ -75,9 +76,9 @@ func (m *Middleware) Auth() gin.HandlerFunc {
 			return
 		}
 
-		c.Set("user_id", claims.Subject)
-		c.Set("role", claims.Role)
-		c.Set("jti", claims.ID)
+		c.Set(constants.UserIDKey, claims.Subject)
+		c.Set(constants.RoleKey, claims.Role)
+		c.Set(constants.AccessJTIKey, claims.ID)
 		
 		c.Next()
 	}
