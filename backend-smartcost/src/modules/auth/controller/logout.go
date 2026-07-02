@@ -19,7 +19,7 @@ func (c *controller) Logout(ctx context.Context, req *RequestLogout) (res *Respo
 		return nil, err
 	}
 
-	if err := c.helper.BlacklistToken(ctx, refreshTokenID, claims.ExpiresAt.Sub(time.Now())); err != nil {
+	if err := c.helper.BlacklistToken(ctx, refreshTokenID, time.Until(claims.ExpiresAt.Time)); err != nil {
 		return nil, err
 	}
 
