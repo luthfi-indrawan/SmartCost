@@ -1,4 +1,4 @@
-package router
+package transactions
 
 import (
 	"backend-smartcost/src/middleware"
@@ -12,5 +12,12 @@ func New(
 	middleware *middleware.Middleware,
 	handler *handler.Handler,
 ) {
+	g := r.Group("/transactions", middleware.Auth())
 
+	g.POST("", handler.CreateTransactionHandler)
+	g.GET("", handler.GetTransactionListHandler)
+	g.GET("/hold", handler.GetHoldBillsHandler)
+	g.GET("/:id", handler.GetTransactionDetailHandler)
+	g.POST("/:id/complete", handler.CompleteHoldBillHandler)
+	g.POST("/:id/return", handler.ReturnItemsHandler)
 }
