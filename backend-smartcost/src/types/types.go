@@ -72,3 +72,34 @@ type (
 		UpdatedAt *time.Time `json:"updated_at,omitempty"`
 	}
 )
+
+
+type ProductType struct {
+	ID                string     `json:"id"`
+	Name              string     `json:"name"`
+	SKU               string     `json:"sku"`
+	Barcode           *string    `json:"barcode,omitempty"`
+	Category          *CategoryRef `json:"category,omitempty"`
+	BasePrice         int        `json:"base_price"`
+	Stock             int        `json:"stock"`
+	MinStockThreshold int        `json:"min_stock_threshold"`
+	Unit              string     `json:"unit"`
+	Description       *string    `json:"description,omitempty"`
+	IsActive          bool       `json:"is_active"`
+	StockStatus       string     `json:"stock_status"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         *time.Time `json:"updated_at,omitempty"`
+	DeletedAt         *time.Time `json:"deleted_at,omitempty"`
+}
+
+type CategoryRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type ProductPriceType struct {
+	ID     string `json:"id"`
+	MinQty int    `json:"min_qty"`
+	Price  int    `json:"price"`
+	Label  string `json:"label"`
+}
