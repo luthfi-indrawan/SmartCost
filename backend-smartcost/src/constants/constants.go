@@ -14,4 +14,7 @@ const (
 	AccessJTIKey = "jti"
 
 	RefreshTokenKey = "refresh_token"
+
+	RoleOwner = "owner"
+	RoleCashier = "cashier"
 )
