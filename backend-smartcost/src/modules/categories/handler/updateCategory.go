@@ -48,7 +48,7 @@ func (h *Handler) UpdateCategoryHandler(c *gin.Context) {
 	})
 
 	if err != nil {
-		fmt.Printf("error on controller: %v", err)
+		fmt.Printf("error on controller: %v\n", err)
 		h.helper.ParsePostgresError(c, err, requestID)
 		return
 	}

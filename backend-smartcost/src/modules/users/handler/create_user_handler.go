@@ -2,6 +2,7 @@ package handler
 
 import (
 	"backend-smartcost/src/modules/users/controller"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -74,6 +75,7 @@ func (h *Handler) CreateUsersHandler(c *gin.Context) {
 	)
 
 	if err != nil {
+		fmt.Printf("error on controller: %v\n", err)
 		h.helper.ParsePostgresError(c, err, requestID)
 		return
 	}

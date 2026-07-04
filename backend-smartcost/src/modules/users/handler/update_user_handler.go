@@ -4,6 +4,7 @@ import (
 	"backend-smartcost/src/modules/users/controller"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -59,6 +60,7 @@ func (h *Handler) UpdateUsersHandler(c *gin.Context) {
 	)
 
 	if err != nil {
+		fmt.Printf("error on controller: %v\n", err)
 
 		if errors.Is(err, sql.ErrNoRows) {
 			h.helper.BuildErrorResponse(

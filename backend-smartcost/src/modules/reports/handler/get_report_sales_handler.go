@@ -2,6 +2,7 @@ package handler
 
 import (
 	"backend-smartcost/src/modules/reports/controller"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -41,6 +42,7 @@ func (h *Handler) GetReportSalesHandler(c *gin.Context) {
 	)
 
 	if err != nil {
+		fmt.Printf("error on controller: %v\n", err)
 
 		switch err.Error() {
 		case "INVALID_DATE_TO_FORMAT":

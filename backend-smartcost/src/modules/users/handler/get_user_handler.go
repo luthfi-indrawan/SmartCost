@@ -2,6 +2,7 @@ package handler
 
 import (
 	"backend-smartcost/src/modules/users/controller"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -39,6 +40,7 @@ func (h *Handler) GetUsersHandler(c *gin.Context) {
 		&req,
 	)
 	if err != nil {
+		fmt.Printf("error on controller: %v\n", err)
 		h.helper.ParsePostgresError(c, err, requestID)
 		return
 	}

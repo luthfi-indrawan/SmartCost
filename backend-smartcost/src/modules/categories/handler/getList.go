@@ -14,7 +14,7 @@ func (h *Handler) GetListCategoriesHandler(c *gin.Context) {
 	result, err := h.controller.GetListCategories(c.Request.Context(), &controller.RequestGetListCategories{})
 
 	if err != nil {
-		fmt.Printf("error on controller: %v", err)
+		fmt.Printf("error on controller: %v\n", err)
 		h.helper.ParsePostgresError(c, err, requestID)
 		return
 	}
