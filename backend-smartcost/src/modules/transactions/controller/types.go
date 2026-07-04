@@ -2,9 +2,6 @@ package controller
 
 import "time"
 
-// ============================================
-// REQUEST TYPES (dari Handler ke Controller)
-// ============================================
 
 type RequestCreateTransaction struct {
 	Type           string
@@ -62,9 +59,6 @@ type RequestListQuery struct {
 	CurrentUserRole string
 }
 
-// ============================================
-// RESPONSE TYPES (dari Controller ke Handler)
-// ============================================
 
 type ResponseCreateTransaction struct {
 	ID               string                    `json:"id"`
@@ -196,7 +190,6 @@ type ResponseHoldBillItem struct {
 	ElapsedMinutes  int        `json:"elapsed_minutes"`
 }
 
-// List metadata
 type ListMetadata struct {
 	Pagination ListPagination `json:"pagination"`
 	Sort       ListSort       `json:"sort"`

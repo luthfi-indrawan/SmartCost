@@ -1,4 +1,4 @@
-package router
+package voidlogs
 
 import (
 	"backend-smartcost/src/middleware"
@@ -12,5 +12,7 @@ func New(
 	middleware *middleware.Middleware,
 	handler *handler.Handler,
 ) {
+	g := r.Group("/void-logs", middleware.Auth())
 
+	g.GET("", handler.GetVoidLogsHandler)
 }
