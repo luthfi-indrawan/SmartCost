@@ -12,5 +12,8 @@ func New(
 	middleware *middleware.Middleware,
 	handler *handler.Handler,
 ) {
+	g := r.Group("/reports", middleware.Auth())
 
+	g.GET("/sales", handler.GetReportSalesHandler)
+	g.GET("/stock-alerts", handler.GetReportStockAlertHandler)
 }
