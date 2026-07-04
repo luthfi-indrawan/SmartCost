@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -65,14 +64,6 @@ func (h *Handler) DeleteUserHandler(c *gin.Context) {
 		h.helper.ParsePostgresError(c, err, requestID)
 		return
 	}
-
-	jti := h.helper.GetJTI(c)
-
-	_ = h.helper.BlacklistToken(
-		c.Request.Context(),
-		jti,
-		24*time.Hour,
-	)
 
 	h.helper.BuildSuccessResponse(
 		c,

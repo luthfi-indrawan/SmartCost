@@ -2,8 +2,6 @@ package controller
 
 import (
 	"context"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 func (c *controller) CreateUsers(
@@ -11,7 +9,7 @@ func (c *controller) CreateUsers(
 	req *CreateUserRequest,
 ) (*CreateUserResponse, error) {
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
+	hashedPassword, err := c.helper.HashingPassword(req.Password)
 	if err != nil {
 		return nil, err
 	}
