@@ -38,7 +38,7 @@ type (
 
 type (
 	SessionType struct {
-		AccessToken           string    `json:"acccess_token"`
+		AccessToken           string    `json:"access_token"`
 		RefreshToken          string    `json:"-"`
 		AccessTokenExpiresAt  time.Time `json:"access_token_expires_at"`
 		RefreshTokenExpiresAt time.Time `json:"refresh_token_expires_at"`

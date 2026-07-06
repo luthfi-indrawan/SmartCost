@@ -13,9 +13,10 @@ func (m *Middleware) Cors() gin.HandlerFunc {
 	if m.cfg.App.Env == "production" {
 		corsConfig.AllowOrigins = m.cfg.App.AllowedOrigins
 	} else {
-		corsConfig.AllowAllOrigins = true
+		corsConfig.AllowOrigins = []string{"http://localhost:3000", "http://localhost:5173"}
 	}
 
+	corsConfig.AllowCredentials = true
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 	corsConfig.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Request-ID"}
 	corsConfig.ExposeHeaders = []string{"Content-Length"}

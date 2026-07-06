@@ -35,7 +35,7 @@ type (
 	}
 
 	ResponseRefresh struct {
-		AccessToken string `json:"acccess_token"`
+		AccessToken string `json:"access_token"`
 		AccessTokenExpiresAt time.Time
 	}
 )
