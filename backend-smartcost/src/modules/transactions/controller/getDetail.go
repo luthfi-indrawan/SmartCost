@@ -76,19 +76,29 @@ func (c *controller) GetTransactionDetail(ctx context.Context, id string, curren
 	for itemRows.Next() {
 		var item ResponseTransactionItem
 		var notes sql.NullString
+
+		item.Product = &ProductRef{}
+
 		err := itemRows.Scan(
-			&item.ID, &item.Product.ID, &item.Product.Name, &item.Product.SKU,
-			&item.Qty, &item.UnitPrice, &item.Subtotal, &notes,
+			&item.ID,
+			&item.Product.ID,
+			&item.Product.Name,
+			&item.Product.SKU,
+			&item.Qty,
+			&item.UnitPrice,
+			&item.Subtotal,
+			&notes,
 		)
 		if err != nil {
 			return nil, err
 		}
+
 		if notes.Valid {
 			item.Notes = &notes.String
 		}
+
 		txn.Items = append(txn.Items, item)
 	}
-
 	// Get void logs
 	voidRows, err := c.db.QueryContext(ctx,
 		`SELECT vl.id, vl.transaction_item_id, vl.cashier_id, uc.name,
@@ -108,16 +118,28 @@ func (c *controller) GetTransactionDetail(ctx context.Context, id string, curren
 
 	for voidRows.Next() {
 		var vl ResponseVoidLog
+
+		vl.Cashier = &CashierRef{}
+		vl.Product = &ProductRef{}
+
 		err := voidRows.Scan(
-			&vl.ID, &vl.TransactionItemID, &vl.Cashier.ID, &vl.Cashier.Name,
-			&vl.Product.ID, &vl.Product.Name, &vl.Product.SKU,
-			&vl.QtyReturned, &vl.RefundAmount, &vl.Reason, &vl.CreatedAt,
+			&vl.ID,
+			&vl.TransactionItemID,
+			&vl.Cashier.ID,
+			&vl.Cashier.Name,
+			&vl.Product.ID,
+			&vl.Product.Name,
+			&vl.Product.SKU,
+			&vl.QtyReturned,
+			&vl.RefundAmount,
+			&vl.Reason,
+			&vl.CreatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
+
 		txn.VoidLogs = append(txn.VoidLogs, vl)
 	}
-
 	return &txn, nil
 }

@@ -10,6 +10,7 @@ import (
 )
 
 func (c *controller) CreateTransaction(ctx context.Context, req *RequestCreateTransaction) (*ResponseCreateTransaction, error) {
+
 	tx, err := c.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -19,22 +20,26 @@ func (c *controller) CreateTransaction(ctx context.Context, req *RequestCreateTr
 	now := time.Now()
 	transactionID := uuid.NewString()
 
-	// Validate: hold bill must have hold_note
 	if req.Type == "hold" && (req.HoldNote == nil || *req.HoldNote == "") {
 		return nil, fmt.Errorf("hold_note is required for hold bill")
 	}
-
-	// Validate items not empty
 	if len(req.Items) == 0 {
 		return nil, fmt.Errorf("items cannot be empty")
 	}
 
-	// Validate all products and resolve prices
 	var totalSubtotal int
 	var responseItems []ResponseTransactionItem
 
+	var bulkInsertItemsQueue []struct {
+		id        string
+		productID string
+		qty       int
+		price     int
+		subtotal  int
+		notes     *string
+	}
+
 	for _, item := range req.Items {
-		// Check product exists and active
 		var productName, productSKU string
 		err := tx.QueryRowContext(ctx,
 			`SELECT name, sku FROM products WHERE id = $1 AND is_active = true AND deleted_at IS NULL`,
@@ -47,22 +52,18 @@ func (c *controller) CreateTransaction(ctx context.Context, req *RequestCreateTr
 			return nil, err
 		}
 
-		// Resolve price
 		resolvedPrice, err := c.resolvePrice(ctx, item.ProductID, item.Qty)
 		if err != nil {
 			return nil, err
 		}
 
-		// Validate price_at_time matches resolved price
 		if item.PriceAtTime != resolvedPrice {
 			return nil, fmt.Errorf("price mismatch for product %s: expected %d, got %d", item.ProductID, resolvedPrice, item.PriceAtTime)
 		}
 
-		// Calculate item subtotal
 		itemSubtotal := resolvedPrice * item.Qty
 		totalSubtotal += itemSubtotal
 
-		// Deduct stock with FOR UPDATE
 		_, err = tx.ExecContext(ctx,
 			`UPDATE products SET stock = stock - $1 WHERE id = $2`,
 			item.Qty, item.ProductID,
@@ -71,16 +72,23 @@ func (c *controller) CreateTransaction(ctx context.Context, req *RequestCreateTr
 			return nil, err
 		}
 
-		// Insert transaction item
 		itemID := uuid.NewString()
-		_, err = tx.ExecContext(ctx,
-			`INSERT INTO transaction_items (id, transaction_id, product_id, qty, unit_price, subtotal, notes, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-			itemID, transactionID, item.ProductID, item.Qty, resolvedPrice, itemSubtotal, item.Notes, now,
-		)
-		if err != nil {
-			return nil, err
-		}
+
+		bulkInsertItemsQueue = append(bulkInsertItemsQueue, struct {
+			id        string
+			productID string
+			qty       int
+			price     int
+			subtotal  int
+			notes     *string
+		}{
+			id:        itemID,
+			productID: item.ProductID,
+			qty:       item.Qty,
+			price:     resolvedPrice,
+			subtotal:  itemSubtotal,
+			notes:     item.Notes,
+		})
 
 		responseItems = append(responseItems, ResponseTransactionItem{
 			ID:        itemID,
@@ -92,17 +100,14 @@ func (c *controller) CreateTransaction(ctx context.Context, req *RequestCreateTr
 		})
 	}
 
-	// Calculate totals
 	total := totalSubtotal - req.DiscountAmount + req.TaxAmount
 
-	// Determine status and payment
 	status := "PENDING"
 	var paymentMethod, amountPaid, changeAmount interface{}
 	var completedAt *time.Time
 
 	if req.Type == "direct" {
 		status = "COMPLETED"
-		// Validate payment
 		if req.Payment == nil {
 			return nil, fmt.Errorf("payment is required for direct transaction")
 		}
@@ -118,7 +123,6 @@ func (c *controller) CreateTransaction(ctx context.Context, req *RequestCreateTr
 		completedAt = &now
 	}
 
-	// Insert transaction
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO transactions 
 		(id, transaction_code, type, status, cashier_id, hold_note, subtotal, discount_amount, tax_amount, total, 
@@ -132,8 +136,17 @@ func (c *controller) CreateTransaction(ctx context.Context, req *RequestCreateTr
 		return nil, err
 	}
 
-	// Generate transaction code via trigger (already set by DB trigger)
-	// Fetch the generated code
+	for _, item := range bulkInsertItemsQueue {
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO transaction_items (id, transaction_id, product_id, qty, unit_price, subtotal, notes, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			item.id, transactionID, item.productID, item.qty, item.price, item.subtotal, item.notes, now,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var transactionCode string
 	err = tx.QueryRowContext(ctx,
 		`SELECT transaction_code FROM transactions WHERE id = $1`,
@@ -147,7 +160,6 @@ func (c *controller) CreateTransaction(ctx context.Context, req *RequestCreateTr
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// Get cashier name
 	cashierName, _ := c.getCashierName(ctx, req.CashierID)
 
 	var respPayment *ResponsePayment

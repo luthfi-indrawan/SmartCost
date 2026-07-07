@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { Menu, X } from "lucide-react";
 import {
   LayoutDashboard,
   Package,
@@ -10,15 +10,14 @@ import {
   AlertTriangle,
   ClipboardList,
   LogOut,
-  X,
   ChevronRight,
+  ShoppingCart,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
-import { useUiStore } from "../../stores/uiStore";
 import { useStockAlerts } from "../../hooks/useReports";
 import { cn } from "../../lib/utils";
 
-const navItems = [
+const ownerNavItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/produk", label: "Produk", icon: Package },
   { path: "/kategori", label: "Kategori", icon: Tags },
@@ -28,13 +27,21 @@ const navItems = [
   { path: "/void-logs", label: "Void Logs", icon: ClipboardList },
 ];
 
+const cashierNavItems = [
+  { path: "/kasir", label: "Kasir", icon: ShoppingCart },
+  { path: "/riwayat", label: "Riwayat", icon: ClipboardList },
+];
+
 export function Sidebar() {
   const navigate = useNavigate();
-  const sidebarOpen = useUiStore((state) => state.sidebarOpen);
-  const closeSidebar = useUiStore((state) => state.closeSidebar);
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
+  const [open, setOpen] = useState(false);
+
   const { criticalCount, lowCount } = useStockAlerts();
   const totalAlerts = criticalCount + lowCount;
+
+  const navItems = user?.role === "owner" ? ownerNavItems : cashierNavItems;
 
   const handleLogout = () => {
     logout();
@@ -43,87 +50,86 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile overlay */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 z-40 lg:hidden"
-            onClick={closeSidebar}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Sidebar */}
-      <motion.aside
-        className={cn(
-          "fixed top-0 left-0 z-50 h-full w-64 bg-wa-surface border-r border-neutral-200 flex flex-col",
-          "lg:translate-x-0 lg:static",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-        initial={false}
-        animate={{ x: sidebarOpen ? 0 : -256 }}
-        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed top-2 left-4 z-50 rounded-lg   bg-white p-2 shadow lg:hidden"
       >
-        {/* Logo */}
-        <div className="flex items-center justify-between px-5 h-14 border-b border-neutral-200">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">SC</span>
+        <Menu className="h-6 w-6" />
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      <aside
+        className={cn(
+          "fixed top-0 left-0 z-50 h-screen w-64 border-r border-neutral-200 bg-wa-surface flex flex-col transition-transform duration-300",
+          open ? "translate-x-0" : "-translate-x-full",
+          "lg:static lg:translate-x-0",
+        )}
+      >
+        <div className="flex items-center justify-between h-14 px-5 border-b border-neutral-200">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500">
+              <span className="text-sm font-bold text-white">SC</span>
             </div>
-            <span className="font-bold text-lg text-neutral-800">
-              SmartCost
-            </span>
+
+            <div>
+              <p className="font-bold text-neutral-800">SmartCost</p>
+              <p className="text-xs text-neutral-500 capitalize">
+                {user?.role}
+              </p>
+            </div>
           </div>
-          <button
-            onClick={closeSidebar}
-            className="p-1 rounded-lg hover:bg-neutral-100 lg:hidden"
-          >
-            <X className="w-5 h-5 text-neutral-500" />
+
+          <button onClick={() => setOpen(false)} className="lg:hidden">
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
-              onClick={closeSidebar}
+              onClick={() => setOpen(false)}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition",
                   isActive
                     ? "bg-primary-50 text-primary-700"
-                    : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-800",
+                    : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900",
                 )
               }
             >
-              <item.icon className="w-5 h-5" />
+              <item.icon className="h-5 w-5" />
+
               <span className="flex-1">{item.label}</span>
+
               {item.path === "/stok-alert" && totalAlerts > 0 && (
-                <span className="bg-danger-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
                   {totalAlerts}
                 </span>
               )}
-              <ChevronRight className="w-4 h-4 text-neutral-400" />
+
+              <ChevronRight className="h-4 w-4 text-neutral-400" />
             </NavLink>
           ))}
         </nav>
 
-        {/* Logout */}
-        <div className="p-3 border-t border-neutral-200">
+        <div className="border-t border-neutral-200 p-3">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-danger-500 hover:bg-danger-50 transition-colors"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
           >
-            <LogOut className="w-5 h-5" />
-            <span>Keluar</span>
+            <LogOut className="h-5 w-5" />
+            Keluar
           </button>
         </div>
-      </motion.aside>
+      </aside>
     </>
   );
 }
