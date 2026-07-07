@@ -67,6 +67,35 @@ export const HOLD_BILL_COLORS = {
   },
 };
 
+// Calculate elapsed minutes from date string
+export const getElapsedMinutes = (dateString) => {
+  if (!dateString) return 0;
+
+  const date = new Date(dateString);
+
+  if (isNaN(date.getTime())) {
+    return 0;
+  }
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+  return Math.max(0, diffMinutes);
+};
+
+// Resolve hold bill color based on elapsed minutes
+export const getHoldBillColor = (minutes) => {
+  if (minutes >= 60) {
+    return HOLD_BILL_COLORS.DANGER;
+  }
+
+  if (minutes >= 30) {
+    return HOLD_BILL_COLORS.WARNING;
+  }
+
+  return HOLD_BILL_COLORS.FRESH;
+};
+
 // Local storage keys
 export const STORAGE_KEYS = {
   CART: "smartcost_cart",
