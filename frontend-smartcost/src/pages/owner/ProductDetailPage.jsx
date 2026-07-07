@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -67,7 +67,7 @@ export default function ProductDetailPage() {
   });
 
   // Populate form when product loads
-  useState(() => {
+  useEffect(() => {
     if (product && !isNew) {
       setValue("name", product.name);
       setValue("sku", product.sku);
@@ -77,13 +77,20 @@ export default function ProductDetailPage() {
       setValue("stock", product.stock);
       setValue("min_stock_threshold", product.min_stock_threshold);
       setValue("unit", product.unit);
-      setValue("description", product.description || "");
+      setValue("description", product?.description || "");
       setTiers(product.price_tiers || []);
     }
-  }, [product]);
+  }, [product, isNew, setValue]);
 
   const addTier = () => {
-    setTiers([...tiers, { min_qty: "", price: "", label: "" }]);
+    setTiers([
+      ...tiers,
+      {
+        min_qty: 0,
+        price: 0,
+        label: "",
+      },
+    ]);
   };
 
   const removeTier = (index) => {
@@ -275,7 +282,7 @@ export default function ProductDetailPage() {
                       type="number"
                       value={tier.min_qty}
                       onChange={(e) =>
-                        updateTier(index, "min_qty", e.target.value)
+                        updateTier(index, "min_qty", Number(e.target.value))
                       }
                       className="w-full h-9 px-3 text-sm bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-primary-500"
                       placeholder="10"
@@ -289,7 +296,7 @@ export default function ProductDetailPage() {
                       type="number"
                       value={tier.price}
                       onChange={(e) =>
-                        updateTier(index, "price", e.target.value)
+                        updateTier(index, "price", Number(e.target.value))
                       }
                       className="w-full h-9 px-3 text-sm bg-white border border-neutral-200 rounded-lg focus:outline-none focus:border-primary-500"
                       placeholder="2500"

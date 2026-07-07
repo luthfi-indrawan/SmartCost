@@ -18,16 +18,24 @@ func (c *controller) AddProduct(ctx context.Context, req *RequestAddProduct) (*R
 
 	id := uuid.NewString()
 	now := time.Now()
-	isActive := req.IsActive
 
 	// Insert product
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO products
-		(id, name, sku, barcode, category_id, base_price, stock, min_stock_threshold, unit, description, is_active, stock_status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'SAFE', $12, $13)`,
-		id, req.Name, req.SKU, req.Barcode, req.CategoryID,
-		req.BasePrice, req.Stock, req.MinStockThreshold, req.Unit,
-		req.Description, isActive, now, now,
+	(id, name, sku, barcode, category_id, base_price, stock, min_stock_threshold, unit, description, is_active, stock_status, created_at, updated_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, 'SAFE', $11, $12)`,
+		id,
+		req.Name,
+		req.SKU,
+		req.Barcode,
+		req.CategoryID,
+		req.BasePrice,
+		req.Stock,
+		req.MinStockThreshold,
+		req.Unit,
+		req.Description,
+		now,
+		now,
 	)
 	if err != nil {
 		return nil, err

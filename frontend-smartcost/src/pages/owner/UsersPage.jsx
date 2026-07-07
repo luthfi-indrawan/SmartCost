@@ -14,17 +14,39 @@ import { ListSkeleton } from "../../components/ui/Skeleton";
 import { formatRupiah } from "../../lib/constants";
 import { cn } from "../../lib/utils";
 
-const userSchema = z.object({
-  name: z.string().min(1, "Nama wajib diisi"),
-  email: z.string().email("Email tidak valid"),
-  password: z.string().min(6, "Password minimal 6 karakter"),
-  phone: z
-    .string()
-    .regex(/^08\d{8,11}$/, "Nomor HP tidak valid")
-    .optional()
-    .or(z.literal("")),
-  role: z.literal("cashier"),
-});
+const userSchema = z
+  .object({
+    name: z.string().min(1, "Nama wajib diisi"),
+    email: z.string().email("Email tidak valid"),
+    password: z.string().optional(),
+    phone: z
+      .string()
+      .regex(/^08\d{8,11}$/, "Nomor HP tidak valid")
+      .optional()
+      .or(z.literal("")),
+    role: z.literal("cashier"),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      (!data.password || data.password.length === 0) &&
+      typeof window !== "undefined" &&
+      document.querySelector('input[type="password"]')
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["password"],
+        message: "Password wajib diisi",
+      });
+    }
+
+    if (data.password && data.password.length > 0 && data.password.length < 6) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["password"],
+        message: "Password minimal 6 karakter",
+      });
+    }
+  });
 
 export default function UsersPage() {
   const [showModal, setShowModal] = useState(false);
@@ -164,12 +186,12 @@ export default function UsersPage() {
                     <Mail className="w-3 h-3" />
                     {user.email}
                   </span>
-                  {user.phone && (
+                  {/* {user.phone && (
                     <span className="flex items-center gap-1">
                       <Phone className="w-3 h-3" />
                       {user.phone}
                     </span>
-                  )}
+                  )} */}
                 </div>
                 <div className="flex items-center gap-3 mt-1.5">
                   <span className="text-xs font-medium text-primary-600">
@@ -237,13 +259,18 @@ export default function UsersPage() {
           />
           <div className="flex gap-3 pt-2">
             <Button
+              type="button"
               variant="outline"
               fullWidth
               onClick={() => setShowModal(false)}
             >
               Batal
             </Button>
-            <Button fullWidth isLoading={isCreating || isUpdating}>
+            <Button
+              type="submit"
+              fullWidth
+              isLoading={isCreating || isUpdating}
+            >
               {editingUser ? "Perbarui" : "Simpan"}
             </Button>
           </div>

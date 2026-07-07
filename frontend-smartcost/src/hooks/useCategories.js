@@ -58,7 +58,8 @@ export function useCategories() {
   });
 
   return {
-    categories: data?.data || [],
+    categories: data?.Data || [],
+    metadata: data?.Metadata,
     isLoading,
     error,
     createCategory: createMutation.mutate,

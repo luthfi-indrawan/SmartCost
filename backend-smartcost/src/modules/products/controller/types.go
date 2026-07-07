@@ -2,8 +2,6 @@ package controller
 
 import "time"
 
-
-
 type RequestAddProduct struct {
 	Name              string
 	SKU               string
@@ -48,25 +46,23 @@ type RequestListQuery struct {
 	SortOrder   string
 }
 
-
-
 type ResponseAddProduct struct {
-	ID                string                `json:"id"`
-	Name              string                `json:"name"`
-	SKU               string                `json:"sku"`
-	Barcode           *string               `json:"barcode,omitempty"`
-	Category          *CategoryRef          `json:"category,omitempty"`
-	BasePrice         int                   `json:"base_price"`
-	Stock             int                   `json:"stock"`
-	MinStockThreshold int                   `json:"min_stock_threshold"`
-	Unit              string                `json:"unit"`
-	Description       *string               `json:"description,omitempty"`
-	IsActive          bool                  `json:"is_active"`
-	PriceTiers        []ResponsePriceTier   `json:"price_tiers"`
-	EffectivePrice    int                   `json:"effective_price"`
-	StockStatus       string                `json:"stock_status"`
-	CreatedAt         time.Time             `json:"created_at"`
-	UpdatedAt         *time.Time            `json:"updated_at,omitempty"`
+	ID                string              `json:"id"`
+	Name              string              `json:"name"`
+	SKU               string              `json:"sku"`
+	Barcode           *string             `json:"barcode,omitempty"`
+	Category          *CategoryRef        `json:"category,omitempty"`
+	BasePrice         int                 `json:"base_price"`
+	Stock             int                 `json:"stock"`
+	MinStockThreshold int                 `json:"min_stock_threshold"`
+	Unit              string              `json:"unit"`
+	Description       *string             `json:"description,omitempty"`
+	IsActive          bool                `json:"is_active"`
+	PriceTiers        []ResponsePriceTier `json:"price_tiers"`
+	EffectivePrice    int                 `json:"effective_price"`
+	StockStatus       string              `json:"stock_status"`
+	CreatedAt         time.Time           `json:"created_at"`
+	UpdatedAt         *time.Time          `json:"updated_at,omitempty"`
 }
 
 type ResponsePriceTier struct {
@@ -98,23 +94,23 @@ type ResponseListProduct struct {
 }
 
 type ResponseGetProduct struct {
-	ID                string            `json:"id"`
-	Name              string            `json:"name"`
-	SKU               string            `json:"sku"`
-	Barcode           *string           `json:"barcode,omitempty"`
-	Category          *CategoryRef      `json:"category,omitempty"`
-	BasePrice         int               `json:"base_price"`
-	Stock             int               `json:"stock"`
-	MinStockThreshold int               `json:"min_stock_threshold"`
-	Unit              string            `json:"unit"`
-	Description       *string           `json:"description,omitempty"`
-	IsActive          bool              `json:"is_active"`
+	ID                string              `json:"id"`
+	Name              string              `json:"name"`
+	SKU               string              `json:"sku"`
+	Barcode           *string             `json:"barcode,omitempty"`
+	Category          *CategoryRef        `json:"category,omitempty"`
+	BasePrice         int                 `json:"base_price"`
+	Stock             int                 `json:"stock"`
+	MinStockThreshold int                 `json:"min_stock_threshold"`
+	Unit              string              `json:"unit"`
+	Description       *string             `json:"description,omitempty"`
+	IsActive          bool                `json:"is_active"`
 	PriceTiers        []ResponsePriceTier `json:"price_tiers"`
-	StockStatus       string            `json:"stock_status"`
-	SalesStats        *SalesStats       `json:"sales_stats,omitempty"`
-	CreatedAt         time.Time         `json:"created_at"`
-	UpdatedAt         *time.Time        `json:"updated_at,omitempty"`
-	DeletedAt         *time.Time        `json:"deleted_at,omitempty"`
+	StockStatus       string              `json:"stock_status"`
+	SalesStats        *SalesStats         `json:"sales_stats,omitempty"`
+	CreatedAt         time.Time           `json:"created_at"`
+	UpdatedAt         *time.Time          `json:"updated_at,omitempty"`
+	DeletedAt         *time.Time          `json:"deleted_at,omitempty"`
 }
 
 type SalesStats struct {
@@ -123,15 +119,15 @@ type SalesStats struct {
 }
 
 type ResponseUpdateProduct struct {
-	ID                string       `json:"id"`
-	Name              string       `json:"name"`
-	SKU               string       `json:"sku"`
-	BasePrice         int          `json:"base_price"`
-	Stock             int          `json:"stock"`
-	MinStockThreshold int          `json:"min_stock_threshold"`
-	Unit              string       `json:"unit"`
-	StockStatus       string       `json:"stock_status"`
-	UpdatedAt         time.Time    `json:"updated_at"`
+	ID                string    `json:"id"`
+	Name              string    `json:"name"`
+	SKU               string    `json:"sku"`
+	BasePrice         int       `json:"base_price"`
+	Stock             int       `json:"stock"`
+	MinStockThreshold int       `json:"min_stock_threshold"`
+	Unit              string    `json:"unit"`
+	StockStatus       string    `json:"stock_status"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type ResponseDeleteProduct struct {
