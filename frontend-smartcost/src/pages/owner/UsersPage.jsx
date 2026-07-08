@@ -246,7 +246,7 @@ export default function UsersPage() {
             <Input
               label="Password"
               type="password"
-              placeholder="Minimal 6 karakter"
+              placeholder="Minimal 8 karakter"
               error={errors.password?.message}
               {...register("password")}
             />

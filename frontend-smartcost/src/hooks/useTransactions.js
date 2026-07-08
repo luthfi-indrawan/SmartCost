@@ -16,14 +16,18 @@ export function useTransactions(params = {}) {
   });
 
   const createMutation = useMutation({
-    mutationFn: transactionsApi.create,
-    onSuccess: (response) => {
+    mutationFn: async (payload) => {
+      const response = await transactionsApi.create(payload);
+      return response.data.result;
+    },
+
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       queryClient.invalidateQueries({ queryKey: ["hold-bills"] });
-      return response.data.result;
     },
+
     onError: (error) => {
       showToast(error.response?.data?.message || "Transaksi gagal", "error");
     },
